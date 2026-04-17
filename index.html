@@ -329,6 +329,51 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
   color:var(--accent); width:22px; flex-shrink:0; }
 .top-ex-name { font-size:13px; color:var(--text); flex:1; }
 .top-ex-count { font-size:12px; color:var(--text3); }
+
+/* PROFILE SCREEN */
+.profile-avatar { width:72px; height:72px; border-radius:50%; display:flex; align-items:center;
+  justify-content:center; font-family:'Barlow Condensed',sans-serif; font-size:28px; font-weight:800;
+  color:#0d0d0d; margin:0 auto 12px; }
+.profile-name-display { font-family:'Barlow Condensed',sans-serif; font-size:26px; font-weight:800;
+  text-align:center; color:var(--text); }
+.profile-meta-display { font-size:13px; color:var(--text3); text-align:center; margin-top:4px; }
+.profile-field { display:flex; flex-direction:column; gap:4px; }
+.profile-field label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+.profile-field input, .profile-field select, .profile-field textarea {
+  background:var(--surface2); border:1px solid var(--border); border-radius:10px;
+  padding:10px 12px; color:var(--text); font-size:14px; font-family:'Barlow',sans-serif;
+  outline:none; width:100%; }
+.profile-field input:focus, .profile-field select:focus, .profile-field textarea:focus {
+  border-color:var(--accent); }
+.profile-field select option { background:#1a1a1a; }
+.profile-two-col { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.profile-section-title { font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+  color:var(--accent2); text-transform:uppercase; letter-spacing:1px;
+  padding-top:8px; border-top:1px solid var(--border); margin-top:4px; }
+
+/* PROGRESS INDICATORS */
+.indicator-card { background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  padding:14px; margin-bottom:10px; }
+.indicator-title { font-family:'Barlow Condensed',sans-serif; font-size:14px; font-weight:700;
+  color:var(--text2); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; }
+.ind-row { display:flex; justify-content:space-between; align-items:center;
+  padding:6px 0; border-bottom:1px solid var(--border); font-size:13px; }
+.ind-row:last-child { border-bottom:none; }
+.ind-label { color:var(--text); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ind-val { color:var(--accent); font-family:'Barlow Condensed',sans-serif; font-size:15px; font-weight:700; margin-left:8px; }
+.ind-trend { font-size:14px; margin-left:4px; }
+.weight-log-row { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+.weight-log-row input { flex:1; background:var(--surface2); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px; color:var(--text); font-size:14px;
+  font-family:'Barlow',sans-serif; outline:none; }
+.weight-log-row input:focus { border-color:var(--accent); }
+.btn-log-weight { background:var(--accent); color:#0d0d0d; border:none; border-radius:8px;
+  padding:8px 16px; font-family:'Barlow Condensed',sans-serif; font-weight:700;
+  font-size:14px; cursor:pointer; white-space:nowrap; }
+.weight-history-item { display:flex; justify-content:space-between; font-size:12px;
+  color:var(--text3); padding:3px 0; }
+.consistency-bar { height:10px; background:var(--surface2); border-radius:99px; overflow:hidden; margin:6px 0; }
+.consistency-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#DA7756,#4ADE80); }
 </style>
 </head>
 <body>
@@ -336,8 +381,8 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
 <!-- HOME -->
 <div id="home" class="screen active">
   <div class="home-hero">
-    <div class="home-badge">⚡ Gym Coach</div>
-    <div class="home-title">TODAY<br>WE <span>TRAIN.</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><div class="home-badge">⚡ Gym Coach</div><div id="home-date" style="font-size:12px;color:var(--text3);letter-spacing:0.5px;"></div></div>
+    <div class="home-title" id="home-greeting">TODAY<br>WE <span>TRAIN.</span></div>
     <div style="font-size:11px;color:var(--text3);letter-spacing:2px;text-transform:uppercase;margin-top:6px;">by Pasquale Cataldo</div>
     <div class="home-stats">
       <div class="stat-cell"><div class="sv" id="stat-sessions">0</div><div class="sl">Total sessions</div></div>
@@ -383,10 +428,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
     </div>
     <div class="filter-hint" id="filter-hint">All groups • no filter active</div>
   </div>
-  <div class="conditions-box">
-    <div class="conditions-lbl">⚠ Considerations for today</div>
-    <textarea class="conditions-input" id="conditions-input" placeholder="e.g. L2-L3 stabilisation surgery, avoid lower back load. Left shoulder pain." oninput="saveConditions()"></textarea>
-  </div>
+
   <div style="padding:0.5rem 1.25rem 0.75rem;display:flex;flex-direction:column;gap:8px;">
     <button class="btn-primary" onclick="openPlanningScreen()">Start session →</button>
     <button onclick="openAIWorkout()" style="width:100%;background:none;border:1px solid rgba(245,201,122,0.35);color:#F5C97A;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase;padding:13px;border-radius:99px;cursor:pointer;">✨ AI Workout</button>
@@ -396,6 +438,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
     <button class="nav-btn" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
     <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
     <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
   </div>
 </div>
 
@@ -424,6 +467,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
     <button class="nav-btn" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
     <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
     <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
   </div>
 </div>
 
@@ -450,6 +494,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
     <button class="nav-btn active" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
     <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
     <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
   </div>
 </div>
 
@@ -517,6 +562,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
     <button class="nav-btn" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
     <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
     <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
   </div>
 </div>
 
@@ -673,7 +719,9 @@ function goTo(id) {
   if (id === 'machines-screen') renderMachineList();
   if (id === 'history-screen') { renderHistory(); populateChartSelect(); }
   if (id === 'stats-screen') renderStats();
+  if (id === 'profile-screen') renderProfileScreen();
   if (id === 'stats-screen') renderStats();
+  if (id === 'profile-screen') renderProfileScreen();
   if (id === 'home') updateHomeStats();
 }
 
@@ -1801,7 +1849,9 @@ function generateAIWorkout() {
   for (var si = 0; si < scored.length && selected.length < targetCount; si++) {
     var item = scored[si];
     var gc = groupCount[item.g] || 0;
-    var maxPerGroup = (requestedGroups.length <= 2) ? 4 : 2;
+    // Adapt volume based on goal
+    var goalMaxPer = userProfile.goal === 'Strength' ? 1 : userProfile.goal === 'Hypertrophy' ? 3 : 2;
+    var maxPerGroup = (requestedGroups.length <= 2) ? 4 : goalMaxPer;
     if (item.score > 0 && gc < maxPerGroup) {
       selected.push(item.m);
       groupCount[item.g] = gc + 1;
@@ -2202,8 +2252,244 @@ function renderStats() {
   }
 }
 
+
+// ── PROFILE ──
+var userProfile = { name:'', age:'', gender:'', height:'', weight:'', goal:'', frequency:3, targetWeight:'', conditions:'' };
+var bodyWeightLog = []; // [{date, weight}]
+var weightLogChart = null;
+
+async function loadProfile() {
+  try {
+    var p = localStorage.getItem('gymcoach_profile');
+    if (p) userProfile = JSON.parse(p);
+    var bw = localStorage.getItem('gymcoach_bodyweight');
+    if (bw) bodyWeightLog = JSON.parse(bw);
+  } catch(e) {}
+  updateHomeGreeting();
+  // Sync conditions to getConditionsText
+  if (userProfile.conditions) {
+    var ci = document.getElementById('conditions-input');
+    if (ci) ci.value = userProfile.conditions;
+  }
+}
+
+async function saveProfile() {
+  userProfile.name        = document.getElementById('p-name').value.trim();
+  userProfile.age         = document.getElementById('p-age').value;
+  userProfile.gender      = document.getElementById('p-gender').value;
+  userProfile.height      = document.getElementById('p-height').value;
+  userProfile.weight      = document.getElementById('p-weight').value;
+  userProfile.goal        = document.getElementById('p-goal').value;
+  userProfile.frequency   = parseInt(document.getElementById('p-frequency').value) || 3;
+  userProfile.targetWeight= document.getElementById('p-target-weight').value;
+  userProfile.conditions  = document.getElementById('p-conditions').value.trim();
+  try { localStorage.setItem('gymcoach_profile', JSON.stringify(userProfile)); } catch(e) {}
+  updateHomeGreeting();
+  updateProfilePreview();
+  // Toast
+  var t = document.getElementById('pr-toast');
+  t.textContent = '✓ Profile saved!';
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2000);
+}
+
+function getConditionsText() {
+  return (userProfile.conditions || '').toLowerCase();
+}
+
+function updateHomeGreeting() {
+  var el = document.getElementById('home-greeting');
+  if (!el) return;
+  if (userProfile.name) {
+    el.innerHTML = 'HI <span>' + esc(userProfile.name.split(' ')[0].toUpperCase()) + '!</span><br>LET\'S <span>TRAIN.</span>';
+  } else {
+    el.innerHTML = 'TODAY<br>WE <span>TRAIN.</span>';
+  }
+}
+
+function updateProfilePreview() {
+  var name = document.getElementById('p-name').value.trim() || 'Your Name';
+  var initials = name.split(' ').map(function(w){ return w[0]; }).join('').slice(0,2).toUpperCase();
+  var colors = ['#DA7756','#F5C97A','#4ADE80','#60A5FA','#C084FC','#F472B6'];
+  var colorIdx = (name.charCodeAt(0)||0) % colors.length;
+  document.getElementById('profile-avatar-display').textContent = initials;
+  document.getElementById('profile-avatar-display').style.background = colors[colorIdx];
+  document.getElementById('profile-name-display').textContent = name;
+  var age = document.getElementById('p-age').value;
+  var gender = document.getElementById('p-gender').value;
+  var height = document.getElementById('p-height').value;
+  var weight = document.getElementById('p-weight').value;
+  var parts = [];
+  if (age) parts.push(age + ' y.o.');
+  if (gender) parts.push(gender);
+  if (height) parts.push(height + ' cm');
+  if (weight) parts.push(weight + ' kg');
+  document.getElementById('profile-meta-display').textContent = parts.join(' · ') || '—';
+}
+
+async function logBodyWeight() {
+  var val = parseFloat(document.getElementById('weight-log-input').value);
+  if (!val || val < 20 || val > 400) { alert('Enter a valid weight'); return; }
+  var today = new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+  // Update or add today's entry
+  var idx = bodyWeightLog.findIndex(function(e){ return e.date === today; });
+  if (idx !== -1) bodyWeightLog[idx].weight = val;
+  else bodyWeightLog.push({ date: today, weight: val, ts: Date.now() });
+  bodyWeightLog.sort(function(a,b){ return (a.ts||0)-(b.ts||0); });
+  try { localStorage.setItem('gymcoach_bodyweight', JSON.stringify(bodyWeightLog)); } catch(e) {}
+  document.getElementById('weight-log-input').value = '';
+  renderWeightLog();
+}
+
+function renderWeightLog() {
+  var histEl = document.getElementById('weight-log-history');
+  var chartWrap = document.getElementById('weight-log-chart-wrap');
+  if (!bodyWeightLog.length) {
+    histEl.innerHTML = '<div style="font-size:12px;color:var(--text3);">No weight logged yet.</div>';
+    chartWrap.style.display = 'none'; return;
+  }
+  chartWrap.style.display = 'block';
+  // Chart
+  var recent = bodyWeightLog.slice(-12);
+  if (weightLogChart) weightLogChart.destroy();
+  weightLogChart = new Chart(document.getElementById('weight-log-chart'), {
+    type: 'line',
+    data: {
+      labels: recent.map(function(e){ return e.date; }),
+      datasets: [{ data: recent.map(function(e){ return e.weight; }),
+        borderColor:'#F5C97A', backgroundColor:'rgba(245,201,122,0.1)',
+        pointBackgroundColor:'#F5C97A', pointRadius:4, fill:true, tension:0.3, borderWidth:2 }]
+    },
+    options: { responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false} },
+      scales: {
+        x:{ ticks:{color:'#666',font:{size:9}}, grid:{display:false} },
+        y:{ ticks:{color:'#F5C97A',font:{size:10},callback:function(v){return v+'kg';}},
+            grid:{color:'rgba(255,255,255,0.05)'} }
+      }
+    }
+  });
+  // Last 5 entries
+  histEl.innerHTML = bodyWeightLog.slice(-5).reverse().map(function(e){
+    return '<div class="weight-history-item"><span>' + e.date + '</span><span style="color:var(--accent2);font-weight:600;">' + e.weight + ' kg</span></div>';
+  }).join('');
+}
+
+function renderProfileScreen() {
+  // Populate fields
+  document.getElementById('p-name').value          = userProfile.name || '';
+  document.getElementById('p-age').value           = userProfile.age || '';
+  document.getElementById('p-gender').value        = userProfile.gender || '';
+  document.getElementById('p-height').value        = userProfile.height || '';
+  document.getElementById('p-weight').value        = userProfile.weight || '';
+  document.getElementById('p-goal').value          = userProfile.goal || '';
+  document.getElementById('p-frequency').value     = userProfile.frequency || 3;
+  document.getElementById('p-target-weight').value = userProfile.targetWeight || '';
+  document.getElementById('p-conditions').value    = userProfile.conditions || '';
+  updateProfilePreview();
+  renderWeightLog();
+  renderProgressIndicators();
+}
+
+function renderProgressIndicators() {
+  if (!sessionHistory.length) {
+    ['ind-strength','ind-consistency','ind-volume','ind-balance'].forEach(function(id){
+      document.getElementById(id).innerHTML = '<div style="font-size:12px;color:var(--text3);">Complete some sessions to see your progress.</div>';
+    });
+    return;
+  }
+
+  // ── STRENGTH: top 5 exercises with trend ──
+  var exWeights = {};
+  sessionHistory.slice().reverse().forEach(function(s) {
+    (s.exercises||[]).forEach(function(e) {
+      if (e.weight > 0) {
+        if (!exWeights[e.name]) exWeights[e.name] = [];
+        exWeights[e.name].push(e.weight);
+      }
+    });
+  });
+  var exList = Object.keys(exWeights).filter(function(n){ return exWeights[n].length >= 2; });
+  exList.sort(function(a,b){
+    var aw = exWeights[a], bw = exWeights[b];
+    return (bw[bw.length-1] - bw[0]) - (aw[aw.length-1] - aw[0]);
+  });
+  var strengthHtml = exList.slice(0,5).map(function(name) {
+    var arr = exWeights[name];
+    var first = arr[0], last = arr[arr.length-1];
+    var diff = last - first;
+    var trend = diff > 0 ? '<span class="ind-trend">📈</span>' : diff < 0 ? '<span class="ind-trend">📉</span>' : '<span class="ind-trend">➡️</span>';
+    var oneRM = Math.round(last * (1 + (12/30)));
+    return '<div class="ind-row"><span class="ind-label">' + esc(name) + '</span><span class="ind-val">' + last + 'kg</span>' + trend + '<span style="font-size:11px;color:var(--text3);margin-left:6px;">1RM~' + oneRM + '</span></div>';
+  }).join('');
+  document.getElementById('ind-strength').innerHTML = strengthHtml || '<div style="font-size:12px;color:var(--text3);">Not enough data yet.</div>';
+
+  // ── CONSISTENCY ──
+  var freq = userProfile.frequency || 3;
+  var now = new Date();
+  var weekStart = new Date(now); weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0,0,0,0);
+  var thisWeek = sessionHistory.filter(function(s){ return s.id >= weekStart.getTime(); }).length;
+  var monthStart = new Date(now.getFullYear(), now.getMonth(), 1).getTime();
+  var thisMonth = sessionHistory.filter(function(s){ return s.id >= monthStart; }).length;
+  var pct = Math.min(100, Math.round(thisWeek/freq*100));
+  // Streak weeks
+  var weekSet = {};
+  sessionHistory.forEach(function(s){ var w = Math.floor(s.id/(7*24*3600*1000)); weekSet[w]=true; });
+  var weeks = Object.keys(weekSet).map(Number).sort(function(a,b){return b-a;});
+  var curWeek = Math.floor(Date.now()/(7*24*3600*1000));
+  var streak = 0;
+  for (var wi=0;wi<weeks.length;wi++){ if(curWeek-weeks[wi]<=wi+1) streak++; else break; }
+  document.getElementById('ind-consistency').innerHTML =
+    '<div class="ind-row"><span class="ind-label">This week</span><span class="ind-val">' + thisWeek + '/' + freq + '</span></div>' +
+    '<div class="consistency-bar"><div class="consistency-fill" style="width:' + pct + '%"></div></div>' +
+    '<div class="ind-row"><span class="ind-label">This month</span><span class="ind-val">' + thisMonth + ' sessions</span></div>' +
+    '<div class="ind-row"><span class="ind-label">🔥 Streak</span><span class="ind-val">' + streak + ' weeks</span></div>';
+
+  // ── VOLUME TREND (last 4 weeks) ──
+  var weekVols = [];
+  for (var w=3;w>=0;w--) {
+    var wk = curWeek-w;
+    var ws = wk*7*24*3600*1000, we = ws+7*24*3600*1000;
+    var vol = 0;
+    sessionHistory.forEach(function(s){ if(s.id>=ws&&s.id<we) vol+=(s.totalVolume||0); });
+    weekVols.push(Math.round(vol));
+  }
+  var volTrend = weekVols[3] > weekVols[0] ? '📈 Increasing' : weekVols[3] < weekVols[0] ? '📉 Decreasing' : '➡️ Stable';
+  document.getElementById('ind-volume').innerHTML =
+    weekVols.map(function(v,i){
+      var label = ['3w ago','2w ago','Last week','This week'][i];
+      return '<div class="ind-row"><span class="ind-label">' + label + '</span><span class="ind-val">' + (v>0?v+' kg':'—') + '</span></div>';
+    }).join('') +
+    '<div style="font-size:12px;color:var(--accent2);margin-top:6px;font-weight:600;">' + volTrend + '</div>';
+
+  // ── MUSCLE BALANCE ──
+  var groupCount = {};
+  sessionHistory.slice(0,10).forEach(function(s){
+    (s.exercises||[]).forEach(function(e){
+      var g = getMuscleGroup(e.name);
+      groupCount[g] = (groupCount[g]||0)+1;
+    });
+  });
+  var allG = ['chest','back','shoulder','biceps','triceps','quads','hamstrings','glutes','core'];
+  var maxG = Math.max.apply(null, allG.map(function(g){ return groupCount[g]||0; }).concat([1]));
+  document.getElementById('ind-balance').innerHTML = allG.map(function(g){
+    var cnt = groupCount[g]||0;
+    var pct = Math.round(cnt/maxG*100);
+    var label = g.charAt(0).toUpperCase()+g.slice(1);
+    var warning = cnt === 0 ? ' <span style="color:var(--red);font-size:10px;">needs work</span>' : '';
+    return '<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">' +
+      '<span style="font-size:11px;color:var(--text);width:76px;flex-shrink:0;">' + label + warning + '</span>' +
+      '<div style="flex:1;height:6px;background:var(--surface2);border-radius:99px;overflow:hidden;">' +
+        '<div style="width:' + pct + '%;height:100%;background:linear-gradient(90deg,#DA7756,#F5C97A);border-radius:99px;"></div>' +
+      '</div>' +
+      '<span style="font-size:11px;color:var(--text3);width:20px;text-align:right;">' + cnt + '</span>' +
+    '</div>';
+  }).join('');
+}
+
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-(async function() { await load(); updateHomeStats(); })();
+(async function() { await load(); await loadProfile(); updateHomeStats(); document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); })();
 </script>
 
 <!-- EXERCISE PICKER -->
@@ -2324,6 +2610,134 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
     <button class="nav-btn" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
     <button class="nav-btn active" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
     <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
+  </div>
+</div>
+
+
+<!-- PROFILE SCREEN -->
+<div id="profile-screen" class="screen">
+  <div class="top-bar">
+    <h2>👤 My Profile</h2>
+    <button onclick="saveProfile()" style="background:var(--accent);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;padding:7px 16px;border-radius:99px;cursor:pointer;">Save</button>
+  </div>
+  <div class="scrollable" style="padding:1.25rem;display:flex;flex-direction:column;gap:12px;">
+
+    <!-- Avatar + name display -->
+    <div style="text-align:center;padding:8px 0;">
+      <div class="profile-avatar" id="profile-avatar-display" style="background:#DA7756;">P</div>
+      <div class="profile-name-display" id="profile-name-display">Your Name</div>
+      <div class="profile-meta-display" id="profile-meta-display">—</div>
+    </div>
+
+    <!-- Personal data -->
+    <div class="profile-section-title">Personal Info</div>
+    <div class="profile-field">
+      <label>Name</label>
+      <input type="text" id="p-name" placeholder="Your name" oninput="updateProfilePreview()">
+    </div>
+    <div class="profile-two-col">
+      <div class="profile-field">
+        <label>Age</label>
+        <input type="number" id="p-age" placeholder="e.g. 35" min="10" max="100">
+      </div>
+      <div class="profile-field">
+        <label>Gender</label>
+        <select id="p-gender">
+          <option value="">—</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+    </div>
+    <div class="profile-two-col">
+      <div class="profile-field">
+        <label>Height (cm)</label>
+        <input type="number" id="p-height" placeholder="e.g. 175" min="100" max="250">
+      </div>
+      <div class="profile-field">
+        <label>Current weight (kg)</label>
+        <input type="number" id="p-weight" placeholder="e.g. 80" min="30" max="300" step="0.1">
+      </div>
+    </div>
+
+    <!-- Goals -->
+    <div class="profile-section-title">Training Goals</div>
+    <div class="profile-field">
+      <label>Primary goal</label>
+      <select id="p-goal">
+        <option value="">—</option>
+        <option value="Hypertrophy">💪 Hypertrophy (muscle mass)</option>
+        <option value="Strength">🏋️ Strength (max weight)</option>
+        <option value="Weight loss">🔥 Weight loss</option>
+        <option value="Toning">✨ Toning</option>
+        <option value="Wellness">🧘 General wellness</option>
+      </select>
+    </div>
+    <div class="profile-field">
+      <label>Sessions per week target</label>
+      <select id="p-frequency">
+        <option value="2">2 sessions/week</option>
+        <option value="3" selected>3 sessions/week</option>
+        <option value="4">4 sessions/week</option>
+        <option value="5">5 sessions/week</option>
+        <option value="6">6 sessions/week</option>
+      </select>
+    </div>
+    <div class="profile-field">
+      <label>Target weight (kg) <span style="color:var(--text3);font-size:10px;">optional</span></label>
+      <input type="number" id="p-target-weight" placeholder="e.g. 75" min="30" max="300" step="0.1">
+    </div>
+
+    <!-- Physical conditions -->
+    <div class="profile-section-title">Physical Conditions</div>
+    <div class="profile-field">
+      <label>Limitations / injuries to consider</label>
+      <textarea id="p-conditions" rows="2" placeholder="e.g. L2-L3 stabilisation surgery, avoid lower back load. Left shoulder pain." style="resize:none;"></textarea>
+    </div>
+
+    <!-- Body weight log -->
+    <div class="profile-section-title">Weight Log</div>
+    <div class="weight-log-row">
+      <input type="number" id="weight-log-input" placeholder="Today's weight (kg)" step="0.1" min="30" max="300">
+      <button class="btn-log-weight" onclick="logBodyWeight()">+ Log</button>
+    </div>
+    <div id="weight-log-chart-wrap" style="background:var(--surface2);border-radius:10px;padding:10px;display:none;">
+      <div style="position:relative;height:100px;"><canvas id="weight-log-chart"></canvas></div>
+    </div>
+    <div id="weight-log-history" style="margin-top:4px;"></div>
+
+    <!-- Progress indicators -->
+    <div class="profile-section-title">Progress Indicators</div>
+
+    <div class="indicator-card">
+      <div class="indicator-title">💪 Strength Trends</div>
+      <div id="ind-strength">—</div>
+    </div>
+
+    <div class="indicator-card">
+      <div class="indicator-title">🔥 Consistency</div>
+      <div id="ind-consistency">—</div>
+    </div>
+
+    <div class="indicator-card">
+      <div class="indicator-title">⚡ Volume Trend</div>
+      <div id="ind-volume">—</div>
+    </div>
+
+    <div class="indicator-card">
+      <div class="indicator-title">🏋️ Muscle Balance</div>
+      <div id="ind-balance">—</div>
+    </div>
+
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="goTo('home')"><span class="ni">🏠</span>Home</button>
+    <button class="nav-btn" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
+    <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
+    <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn active" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
   </div>
 </div>
 
