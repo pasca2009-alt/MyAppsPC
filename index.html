@@ -374,6 +374,28 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
   color:var(--text3); padding:3px 0; }
 .consistency-bar { height:10px; background:var(--surface2); border-radius:99px; overflow:hidden; margin:6px 0; }
 .consistency-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#DA7756,#4ADE80); }
+
+/* MANUAL SCREEN */
+.manual-section { margin-bottom: 1.5rem; }
+.manual-h1 { font-family:'Barlow Condensed',sans-serif; font-size:22px; font-weight:800;
+  color:var(--accent); text-transform:uppercase; letter-spacing:1px;
+  padding-bottom:6px; border-bottom:2px solid rgba(218,119,86,0.3);
+  margin-bottom:10px; margin-top:4px; }
+.manual-h2 { font-family:'Barlow Condensed',sans-serif; font-size:17px; font-weight:700;
+  color:var(--text2); margin-bottom:6px; margin-top:14px; }
+.manual-p { font-size:14px; color:var(--text); line-height:1.7; margin-bottom:8px; }
+.manual-bullet { font-size:14px; color:var(--text); line-height:1.65;
+  padding-left:16px; position:relative; margin-bottom:5px; }
+.manual-bullet::before { content:'•'; position:absolute; left:0; color:var(--accent); font-weight:700; }
+.manual-tip { background:rgba(218,119,86,0.08); border-left:3px solid var(--accent);
+  border-radius:0 8px 8px 0; padding:10px 12px; margin:10px 0;
+  font-size:13px; color:var(--text); line-height:1.6; }
+.manual-tip b { color:var(--accent); }
+.manual-warn { background:rgba(245,201,122,0.08); border-left:3px solid var(--accent2);
+  border-radius:0 8px 8px 0; padding:10px 12px; margin:10px 0;
+  font-size:13px; color:var(--text); line-height:1.6; }
+.manual-warn b { color:var(--accent2); }
+.manual-divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
 </style>
 </head>
 <body>
@@ -431,7 +453,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
 
   <div style="padding:0.5rem 1.25rem 0.75rem;display:flex;flex-direction:column;gap:8px;">
     <button class="btn-primary" onclick="openPlanningScreen()">Start session →</button>
-    <button onclick="openAIWorkout()" style="width:100%;background:none;border:1px solid rgba(245,201,122,0.35);color:#F5C97A;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:15px;letter-spacing:1px;text-transform:uppercase;padding:13px;border-radius:99px;cursor:pointer;">✨ AI Workout</button>
+    <button onclick="goTo('manual-screen')" style="width:100%;background:none;border:1px solid var(--border);color:var(--text3);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:11px;border-radius:99px;cursor:pointer;">📖 User Manual</button>
   </div>
   <div class="nav-bar">
     <button class="nav-btn active" onclick="goTo('home')"><span class="ni">🏠</span>Home</button>
@@ -455,6 +477,14 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
   <div class="scrollable" style="padding:1.25rem;display:flex;flex-direction:column;gap:0.75rem;">
     <div style="font-size:13px;color:var(--text3);line-height:1.6;" id="plan-desc">
       AI selected these exercises based on your history. Remove, add or reorder — then start.
+    </div>
+    <!-- Customize / AI regenerate -->
+    <div style="background:var(--surface);border:1px solid rgba(245,201,122,0.2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:8px;">
+      <div style="font-size:11px;color:var(--accent2);text-transform:uppercase;letter-spacing:1px;font-weight:600;">✨ Customize</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input id="plan-customize-input" type="text" placeholder="e.g. more upper body, avoid legs..." style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;font-family:'Barlow',sans-serif;outline:none;">
+        <button onclick="regeneratePlan()" style="background:var(--accent2);color:#0d0d0d;border:none;border-radius:8px;padding:8px 14px;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;cursor:pointer;white-space:nowrap;">↺ Regenerate</button>
+      </div>
     </div>
     <div id="plan-list"></div>
     <button class="plan-add-btn" onclick="openPlanPicker()">⊕ Add exercise</button>
@@ -608,6 +638,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
     <button class="nav-btn" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
     <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
     <button class="nav-btn active" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
   </div>
 </div>
 
@@ -1556,14 +1587,48 @@ function openVideo() {
   window.open(url, '_blank');
 }
 
+function buildPickerItems(searchTerm) {
+  var list = document.getElementById('picker-list');
+  var doneIds = {};
+  completedLog.forEach(function(e){ doneIds[e.id] = true; });
+  var term = (searchTerm || '').toLowerCase().trim();
+  var sorted = machines.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  list.innerHTML = '';
+  sorted.forEach(function(m) {
+    if (term && m.name.toLowerCase().indexOf(term) === -1) return;
+    var isDone = !!doneIds[m.id];
+    var isFiltered = !isMachineAllowed(m.name);
+    var div = document.createElement('div');
+    div.className = 'picker-item' + (isDone ? ' done' : '') + (isFiltered ? ' done' : '');
+    div.innerHTML =
+      '<div class="picker-icon">' + getMachineIcon(m.name) + '</div>' +
+      '<div class="picker-info">' +
+        '<div class="picker-name">' + esc(m.name) + '</div>' +
+        '<div class="picker-meta">' + m.series + ' sets · ' + m.reps + ' rips.</div>' +
+      '</div>' +
+      (m.weight ? '<span class="picker-weight">' + m.weight + ' kg</span>' : '');
+    div.addEventListener('click', function(){ selectExercise(m); });
+    list.appendChild(div);
+  });
+}
+
+function filterPickerList() {
+  var term = document.getElementById('picker-search').value;
+  buildPickerItems(term);
+}
+
 function openPicker() {
   var list = document.getElementById('picker-list');
   // Build set of already-done machine IDs this session
   var doneIds = {};
   completedLog.forEach(function(e){ doneIds[e.id] = true; });
+  // Reset search
+  var searchEl = document.getElementById('picker-search');
+  if (searchEl) searchEl.value = '';
 
   list.innerHTML = '';
-  machines.forEach(function(m) {
+  var sorted = machines.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  sorted.forEach(function(m) {
     var isDone = !!doneIds[m.id];
     var isFiltered = !isMachineAllowed(m.name);
     var div = document.createElement('div');
@@ -2085,10 +2150,13 @@ function renderPlanList() {
 function openPlanPicker() {
   // Reuse existing picker but route selection to plan
   var list = document.getElementById('picker-list');
+  var searchEl = document.getElementById('picker-search');
+  if (searchEl) { searchEl.value = ''; searchEl.oninput = filterPlanPickerList; }
   var doneIds = {};
   plannedExercises.forEach(function(m){ doneIds[m.id] = true; });
   list.innerHTML = '';
-  machines.forEach(function(m) {
+  var sorted = machines.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  sorted.forEach(function(m) {
     var inPlan = !!doneIds[m.id];
     var div = document.createElement('div');
     div.className = 'picker-item' + (inPlan ? ' done' : '');
@@ -2488,6 +2556,60 @@ function renderProgressIndicators() {
   }).join('');
 }
 
+function filterPlanPickerList() {
+  var term = (document.getElementById('picker-search').value || '').toLowerCase();
+  var list = document.getElementById('picker-list');
+  var doneIds = {};
+  plannedExercises.forEach(function(m){ doneIds[m.id] = true; });
+  list.innerHTML = '';
+  var sorted = machines.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  sorted.forEach(function(m) {
+    if (term && m.name.toLowerCase().indexOf(term) === -1) return;
+    var inPlan = !!doneIds[m.id];
+    var div = document.createElement('div');
+    div.className = 'picker-item' + (inPlan ? ' done' : '');
+    div.innerHTML =
+      '<div class="picker-icon">' + getMachineIcon(m.name) + '</div>' +
+      '<div class="picker-info">' +
+        '<div class="picker-name">' + esc(m.name) + '</div>' +
+        '<div class="picker-meta">' + m.series + ' sets · ' + m.reps + '</div>' +
+      '</div>' +
+      (m.weight ? '<span class="picker-weight">' + m.weight + ' kg</span>' : '');
+    div.addEventListener('click', function() {
+      if (!inPlan) { plannedExercises.push(m); renderPlanList(); }
+      document.getElementById('picker-overlay').classList.remove('open');
+    });
+    list.appendChild(div);
+  });
+}
+
+function regeneratePlan() {
+  var prompt = (document.getElementById('plan-customize-input').value || '').toLowerCase().trim();
+  // Temporarily override keyword scoring based on prompt
+  var savedFilters = activeFilters.slice();
+  if (prompt) {
+    // Parse prompt for muscle group keywords
+    var keyMap = {
+      'chest':     ['chest','pec','press'],
+      'back':      ['back','lat','row','pull'],
+      'shoulders': ['shoulder','delt'],
+      'arms':      ['arm','bicep','tricep','curl'],
+      'legs':      ['leg','quad','hamstring','glute','squat'],
+      'core':      ['core','ab','crunch']
+    };
+    var matched = [];
+    for (var k in keyMap) {
+      keyMap[k].forEach(function(kw){ if (prompt.indexOf(kw) !== -1 && matched.indexOf(k) === -1) matched.push(k); });
+    }
+    if (matched.length > 0) activeFilters = matched;
+  }
+  plannedExercises = generatePlan();
+  activeFilters = savedFilters;
+  renderPlanList();
+  var desc = document.getElementById('plan-desc');
+  if (desc && prompt) desc.innerHTML = 'Regenerated based on: <span style="color:var(--accent2);">"' + esc(prompt) + '"</span>';
+}
+
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 (async function() { await load(); await loadProfile(); updateHomeStats(); document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); })();
 </script>
@@ -2496,8 +2618,11 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 <div class="picker-overlay" id="picker-overlay" onclick="closePicker(event)">
   <div class="picker-sheet">
     <div class="picker-header">
-      <span class="picker-title">Scegli exerciseso</span>
+      <span class="picker-title">Choose exercise</span>
       <button class="picker-close" onclick="closePicker()">✕</button>
+    </div>
+    <div style="padding:0.5rem 1rem 0;">
+      <input id="picker-search" type="text" placeholder="🔍 Search exercise..." oninput="filterPickerList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);font-size:14px;font-family:'Barlow',sans-serif;outline:none;">
     </div>
     <div class="picker-list" id="picker-list"></div>
   </div>
@@ -2738,6 +2863,206 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
     <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
     <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
     <button class="nav-btn active" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
+  </div>
+</div>
+
+
+<!-- MANUAL SCREEN -->
+<div id="manual-screen" class="screen">
+  <div class="top-bar">
+    <h2>📖 User Manual</h2>
+    <button onclick="goTo('home')" style="background:none;border:1px solid var(--border);color:var(--text2);font-size:13px;padding:7px 14px;border-radius:99px;cursor:pointer;font-family:'Barlow',sans-serif;">✕ Close</button>
+  </div>
+  <div class="scrollable" style="padding:1.25rem;">
+
+    <div style="text-align:center;padding:1rem 0 1.5rem;">
+      <div style="font-size:40px;margin-bottom:8px;">⚡</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:28px;font-weight:800;color:var(--accent);">GYM COACH</div>
+      <div style="font-size:13px;color:var(--text3);margin-top:4px;">Personal Workout Tracker — User Manual</div>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 1 INTRO -->
+    <div class="manual-section">
+      <div class="manual-h1">1. Introduction</div>
+      <p class="manual-p">Gym Coach is a personal workout tracking app designed for iPhone. It runs entirely in Safari as a PWA — no installation needed, works offline, and saves all data directly on your device.</p>
+      <p class="manual-p">Every session is smarter than the last: the AI planner automatically balances muscle groups based on your training history.</p>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 2 INSTALLATION -->
+    <div class="manual-section">
+      <div class="manual-h1">2. Installation on iPhone</div>
+      <div class="manual-bullet">Open Safari and go to your Netlify URL</div>
+      <div class="manual-bullet">Tap the Share button (rectangle with arrow) at the bottom</div>
+      <div class="manual-bullet">Tap <b>Add to Home Screen</b></div>
+      <div class="manual-bullet">Confirm with <b>Add</b> — the icon appears on your home screen</div>
+      <div class="manual-tip"><b>💡 Tip:</b> Always open from the home screen icon, not directly from Safari, to get the full-screen experience.</div>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 3 HOME -->
+    <div class="manual-section">
+      <div class="manual-h1">3. Home Screen</div>
+
+      <div class="manual-h2">Stats Bar</div>
+      <p class="manual-p">Four cards show: Total sessions, Exercises in library, Total sets, and Last session date.</p>
+
+      <div class="manual-h2">Muscle Group Filter</div>
+      <p class="manual-p">Tap one or more chips (Chest, Back, Shoulders, Arms, Legs, Core) to focus your session. With no chips selected, the session is full body.</p>
+
+      <div class="manual-h2">Considerations Field</div>
+      <p class="manual-p">Describe physical limitations here (e.g. <i>"L2-L3 stabilisation, avoid lower back load"</i>). The planner automatically excludes risky exercises. Recognises English and Italian terms.</p>
+
+      <div class="manual-h2">Start Session</div>
+      <p class="manual-p">Opens the Review & Edit planning screen where you approve your workout before it begins.</p>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 4 PLANNING -->
+    <div class="manual-section">
+      <div class="manual-h1">4. Review & Edit</div>
+      <p class="manual-p">Before every session the AI generates 10 personalised exercises based on your history.</p>
+
+      <div class="manual-h2">How the AI selects exercises</div>
+      <div class="manual-bullet">Groups trained recently get lower priority</div>
+      <div class="manual-bullet">Last 3 sessions carry a weighted penalty (100% / 60% / 30%)</div>
+      <div class="manual-bullet">Max 2 exercises per muscle group by default</div>
+      <div class="manual-bullet">Physical conditions automatically exclude risky exercises</div>
+      <div class="manual-bullet">Your training goal adjusts variety (Strength = fewer, Hypertrophy = more)</div>
+
+      <div class="manual-h2">Modifying the plan</div>
+      <div class="manual-bullet">Tap <b>✕</b> to remove an exercise</div>
+      <div class="manual-bullet">Tap <b>⊕ Add exercise</b> to add one from your library (searchable, alphabetical)</div>
+
+      <div class="manual-h2">Customize & Regenerate</div>
+      <p class="manual-p">Type a request (e.g. <i>"more upper body"</i>, <i>"focus on chest"</i>) and tap <b>↺ Regenerate</b> to get a new list instantly.</p>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 5 WORKOUT -->
+    <div class="manual-section">
+      <div class="manual-h1">5. Workout Screen</div>
+
+      <div class="manual-h2">Exercise Card</div>
+      <p class="manual-p">Shows exercise name, sets, reps, and muscle tags. Tap <b>▼ Coach AI</b> for expert technique notes personalised to your current weight.</p>
+
+      <div class="manual-h2">Weight</div>
+      <p class="manual-p">The app recalls the last weight used. Type a new value and tap <b>Update</b> to change and save it.</p>
+
+      <div class="manual-h2">Completing Sets</div>
+      <div class="manual-bullet">Tap <b>✓ Complete set N</b> — the dot turns green</div>
+      <div class="manual-bullet">When all sets are done, the next exercise loads automatically</div>
+
+      <div class="manual-h2">Postpone & Skip</div>
+      <div class="manual-bullet"><b>⏭ Postpone</b> — machine busy? Sends exercise to end of queue, comes back later</div>
+      <div class="manual-bullet"><b>✕ Skip</b> — permanently skips the exercise for this session</div>
+
+      <div class="manual-h2">Recovery Timer</div>
+      <p class="manual-p">Tap <b>⏱ Start Recovery Timer</b>. Default is 90 seconds. Use − / + to adjust in 15s steps. Phone vibrates when time is up.</p>
+
+      <div class="manual-h2">Choose Exercise</div>
+      <p class="manual-p">Tap <b>⊕ Choose exercise</b> at any time to manually pick a different exercise. Search field + alphabetical list.</p>
+
+      <div class="manual-h2">Finish</div>
+      <p class="manual-p">Tap <b>Finish ✓</b> in the top bar to end and save the session.</p>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 6 DONE -->
+    <div class="manual-section">
+      <div class="manual-h1">6. Session Complete</div>
+      <p class="manual-p">Summary shows exercises completed, total sets, and volume in tons (sets × reps × kg ÷ 1000). A <b>🏆 PR badge</b> appears next to any exercise where you set a new personal record.</p>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 7 HISTORY -->
+    <div class="manual-section">
+      <div class="manual-h1">7. History</div>
+      <p class="manual-p">A <b>line chart</b> at the top shows weight progression for a selected exercise. Below, each session card shows date, time, exercises, sets, and volume. Tap to expand and see details.</p>
+      <div class="manual-bullet">Tap <b>🗑 Delete session</b> to remove a session permanently</div>
+      <div class="manual-bullet"><b>⬆ Export</b> — download a JSON backup of all your data</div>
+      <div class="manual-bullet"><b>⬇ Import</b> — restore from a backup file</div>
+      <div class="manual-warn"><b>⚠ Important:</b> Always Export before uploading a new version of the app to Netlify. Import after updating to restore your data.</div>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 8 STATS -->
+    <div class="manual-section">
+      <div class="manual-h1">8. Statistics</div>
+      <div class="manual-bullet"><b>🔥 Week streak</b> — consecutive weeks with at least one session</div>
+      <div class="manual-bullet"><b>💪 Sessions</b> — total sessions completed</div>
+      <div class="manual-bullet"><b>⚡ Total tons</b> — cumulative volume</div>
+      <div class="manual-bullet"><b>📈 Weekly Volume</b> — bar chart of last 8 weeks</div>
+      <div class="manual-bullet"><b>🏋️ Muscle Groups</b> — most trained groups</div>
+      <div class="manual-bullet"><b>🏆 Personal Records</b> — best weight per exercise</div>
+      <div class="manual-bullet"><b>⭐ Top 5 Exercises</b> — most frequent exercises</div>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 9 PROFILE -->
+    <div class="manual-section">
+      <div class="manual-h1">9. Profile</div>
+
+      <div class="manual-h2">Personal Info</div>
+      <p class="manual-p">Name (used for home screen greeting), age, gender, height, weight, training goal, sessions/week target, target weight, and physical limitations.</p>
+
+      <div class="manual-h2">Weight Log</div>
+      <p class="manual-p">Log your body weight anytime. A chart tracks your trend over time.</p>
+
+      <div class="manual-h2">Progress Indicators</div>
+      <div class="manual-bullet"><b>💪 Strength Trends</b> — top exercises with weight trend and estimated 1RM (Epley formula)</div>
+      <div class="manual-bullet"><b>🔥 Consistency</b> — sessions vs weekly target, monthly count, streak</div>
+      <div class="manual-bullet"><b>⚡ Volume Trend</b> — last 4 weeks with Increasing / Stable / Decreasing label</div>
+      <div class="manual-bullet"><b>🏋️ Muscle Balance</b> — bar per group; "needs work" flag for untrained groups</div>
+      <p class="manual-p">Tap <b>Save</b> in the top bar to persist all changes.</p>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 10 EXERCISES -->
+    <div class="manual-section">
+      <div class="manual-h1">10. Exercises</div>
+      <p class="manual-p">Add custom exercises with name, sets, reps, weight, and muscles. Tap <b>✕</b> to delete. The app comes with 50 pre-loaded exercises covering machines and cables.</p>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 11 DATA -->
+    <div class="manual-section">
+      <div class="manual-h1">11. Data & Privacy</div>
+      <p class="manual-p">All data is stored locally on your device. Nothing is sent to any server.</p>
+      <div class="manual-warn"><b>⚠ Note:</b> Clearing Safari cache will erase all app data. Keep regular Export backups to protect your history.</div>
+    </div>
+
+    <hr class="manual-divider">
+
+    <!-- 12 TIPS -->
+    <div class="manual-section">
+      <div class="manual-h1">12. Tips & Best Practices</div>
+      <div class="manual-bullet">Log your weight for every exercise — helps the AI improve suggestions over time</div>
+      <div class="manual-bullet">Update your profile goal and conditions whenever your situation changes</div>
+      <div class="manual-bullet">Export your data at least once a week if you train frequently</div>
+      <div class="manual-bullet">The muscle balance chart quickly shows if you are neglecting a group</div>
+      <div class="manual-bullet">Use Postpone instead of Skip when a machine is occupied — the exercise comes back later</div>
+      <div class="manual-bullet">If the planner keeps suggesting the same exercises, your training is well balanced — that is a good sign</div>
+    </div>
+
+    <hr class="manual-divider">
+
+    <div style="text-align:center;padding:1rem 0;font-size:12px;color:var(--text3);">
+      ⚡ Gym Coach — built with care for your training<br>by Pasquale Cataldo
+    </div>
+
   </div>
 </div>
 
