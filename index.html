@@ -396,6 +396,19 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
   font-size:13px; color:var(--text); line-height:1.6; }
 .manual-warn b { color:var(--accent2); }
 .manual-divider { border:none; border-top:1px solid var(--border); margin:20px 0; }
+
+/* MULTI-SELECT PICKER */
+.picker-item.selected { border-color:var(--accent); background:rgba(218,119,86,0.12); }
+.picker-item.selected::after { content:'✓'; position:absolute; right:12px; top:50%;
+  transform:translateY(-50%); color:var(--accent); font-weight:800; font-size:16px; }
+.picker-item { position:relative; }
+.picker-multi-bar { padding:0.75rem 1rem 0.5rem; border-top:1px solid var(--border);
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex-shrink:0; }
+.picker-multi-count { font-size:13px; color:var(--text2); font-weight:600; }
+.picker-multi-confirm { background:var(--accent); color:#0d0d0d; border:none;
+  font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:15px;
+  letter-spacing:1px; text-transform:uppercase; padding:10px 20px;
+  border-radius:99px; cursor:pointer; }
 </style>
 </head>
 <body>
@@ -452,8 +465,22 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
   </div>
 
   <div style="padding:0.5rem 1.25rem 0.75rem;display:flex;flex-direction:column;gap:8px;">
-    <button class="btn-primary" onclick="openPlanningScreen()">Start session →</button>
-    <button onclick="goTo('manual-screen')" style="width:100%;background:none;border:1px solid var(--border);color:var(--text3);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:11px;border-radius:99px;cursor:pointer;">📖 User Manual</button>
+    <div style="display:flex;align-items:center;justify-content:center;margin-bottom:2px;">
+      <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Start new session</span>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="openPlanningScreen()" style="flex:1;background:linear-gradient(135deg,#DA7756,#c4623d);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:15px 10px;border-radius:14px;cursor:pointer;box-shadow:0 4px 20px rgba(218,119,86,0.35);display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <span style="font-size:22px;">🤖</span>
+        <span>AI</span>
+        <span style="font-size:10px;opacity:0.7;font-weight:600;">Auto plan</span>
+      </button>
+      <button onclick="openManualSession()" style="flex:1;background:var(--surface);color:var(--text);border:1.5px solid var(--border2);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:15px 10px;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <span style="font-size:22px;">✏️</span>
+        <span>Manual</span>
+        <span style="font-size:10px;color:var(--text3);font-weight:600;">I choose</span>
+      </button>
+    </div>
+    <button onclick="goTo('manual-screen')" style="width:100%;background:none;border:1px solid var(--border);color:var(--text3);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;text-transform:uppercase;padding:10px;border-radius:99px;cursor:pointer;">📖 User Manual</button>
   </div>
   <div class="nav-bar">
     <button class="nav-btn active" onclick="goTo('home')"><span class="ni">🏠</span>Home</button>
@@ -487,7 +514,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
       </div>
     </div>
     <div id="plan-list"></div>
-    <button class="plan-add-btn" onclick="openPlanPicker()">⊕ Add exercise</button>
+    <button class="plan-add-btn" onclick="openPlanPicker(false)">⊕ Add exercise</button>
   </div>
   <div style="padding:0.75rem 1.25rem 1rem;">
     <button class="btn-primary" onclick="startPlannedWorkout()">Start workout →</button>
@@ -745,12 +772,13 @@ async function saveMachines() { try { localStorage.setItem('gymcoach_machines_v2
 async function saveHistory()  { try { localStorage.setItem('gymcoach_sessions', JSON.stringify(sessionHistory)); } catch(e) {} }
 
 function goTo(id) {
-  document.querySelectorAll('.screen').forEach(function(s){ s.classList.remove('active'); });
+  document.querySelectorAll('.screen').forEach(function(s){
+    s.classList.remove('active');
+    s.style.display = ''; // reset any inline display override
+  });
   document.getElementById(id).classList.add('active');
   if (id === 'machines-screen') renderMachineList();
   if (id === 'history-screen') { renderHistory(); populateChartSelect(); }
-  if (id === 'stats-screen') renderStats();
-  if (id === 'profile-screen') renderProfileScreen();
   if (id === 'stats-screen') renderStats();
   if (id === 'profile-screen') renderProfileScreen();
   if (id === 'home') updateHomeStats();
@@ -1221,14 +1249,21 @@ var aiWorkoutActive = false;
 var postponedMachines = [];
 
 function pickNextMachine() {
-  // If AI workout is active, use the queue
+  // If AI/planned workout is active, use the queue
   if (aiWorkoutActive && aiWorkoutQueue.length > 0) {
     var doneMachineIds = {};
     completedLog.forEach(function(e){ doneMachineIds[e.id] = true; });
-    // Find first in queue not yet done
+    // Build postponed set
+    var postponedIds = {};
+    postponedMachines.forEach(function(m){ postponedIds[m.id] = true; });
+    var currentId = currentMachine ? currentMachine.id : -1;
+    // Find first in queue not yet done, not postponed, not current
     for (var qi = 0; qi < aiWorkoutQueue.length; qi++) {
-      if (!doneMachineIds[aiWorkoutQueue[qi].id]) return aiWorkoutQueue[qi];
+      var m = aiWorkoutQueue[qi];
+      if (!doneMachineIds[m.id] && !postponedIds[m.id] && m.id !== currentId) return m;
     }
+    // All queue done — offer postponed machines
+    if (postponedMachines.length > 0) return postponedMachines.shift();
     return null; // all done
   }
   var upperGroups = ['chest','back','shoulder','biceps','triceps'];
@@ -2112,6 +2147,20 @@ function generatePlan() {
   return selected;
 }
 
+function openManualSession() {
+  if (!machines.length) { alert('Add at least one exercise first!'); return; }
+  plannedExercises = [];
+  renderPlanList();
+  var desc = document.getElementById('plan-desc');
+  if (desc) desc.innerHTML = 'Pick your exercises manually using <b>⊕ Add exercise</b> below.';
+  // Update top bar label
+  var span = document.querySelector('#planning-screen .top-bar span:last-child');
+  if (span) span.textContent = 'Manual selection';
+  goTo('planning-screen');
+  // Auto-open picker after short delay
+  setTimeout(function(){ openPlanPicker(true); }, 350);
+}
+
 function openPlanningScreen() {
   if (!machines.length) { alert('Add at least one exercise first!'); return; }
   plannedExercises = generatePlan();
@@ -2147,19 +2196,35 @@ function renderPlanList() {
   });
 }
 
-function openPlanPicker() {
-  // Reuse existing picker but route selection to plan
+var multiSelectMode = false;
+var multiSelected = {};
+
+function openPlanPicker(multi) {
+  multiSelectMode = !!multi;
+  multiSelected = {};
   var list = document.getElementById('picker-list');
   var searchEl = document.getElementById('picker-search');
-  if (searchEl) { searchEl.value = ''; searchEl.oninput = filterPlanPickerList; }
+  var multiBar = document.getElementById('picker-multi-bar');
+  if (searchEl) { searchEl.value = ''; searchEl.oninput = function(){ buildPlanPickerItems(searchEl.value); }; }
+  if (multiBar) multiBar.style.display = multiSelectMode ? 'flex' : 'none';
+  updateMultiCount();
+  buildPlanPickerItems('');
+  document.getElementById('picker-overlay').classList.add('open');
+}
+
+function buildPlanPickerItems(term) {
+  var list = document.getElementById('picker-list');
   var doneIds = {};
   plannedExercises.forEach(function(m){ doneIds[m.id] = true; });
+  var t = (term || '').toLowerCase();
   list.innerHTML = '';
   var sorted = machines.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
   sorted.forEach(function(m) {
+    if (t && m.name.toLowerCase().indexOf(t) === -1) return;
     var inPlan = !!doneIds[m.id];
+    var isSelected = !!multiSelected[m.id];
     var div = document.createElement('div');
-    div.className = 'picker-item' + (inPlan ? ' done' : '');
+    div.className = 'picker-item' + (inPlan && !multiSelectMode ? ' done' : '') + (isSelected ? ' selected' : '');
     div.innerHTML =
       '<div class="picker-icon">' + getMachineIcon(m.name) + '</div>' +
       '<div class="picker-info">' +
@@ -2167,16 +2232,48 @@ function openPlanPicker() {
         '<div class="picker-meta">' + m.series + ' sets · ' + m.reps + '</div>' +
       '</div>' +
       (m.weight ? '<span class="picker-weight">' + m.weight + ' kg</span>' : '');
-    div.addEventListener('click', function() {
-      if (!inPlan) {
-        plannedExercises.push(m);
-        renderPlanList();
-      }
-      document.getElementById('picker-overlay').classList.remove('open');
-    });
+    if (multiSelectMode) {
+      div.addEventListener('click', function() {
+        if (multiSelected[m.id]) {
+          delete multiSelected[m.id];
+          div.classList.remove('selected');
+        } else {
+          multiSelected[m.id] = m;
+          div.classList.add('selected');
+        }
+        updateMultiCount();
+      });
+    } else {
+      div.addEventListener('click', function() {
+        if (!inPlan) { plannedExercises.push(m); renderPlanList(); }
+        document.getElementById('picker-overlay').classList.remove('open');
+      });
+    }
     list.appendChild(div);
   });
-  document.getElementById('picker-overlay').classList.add('open');
+}
+
+function updateMultiCount() {
+  var count = Object.keys(multiSelected).length;
+  var el = document.getElementById('picker-multi-count');
+  if (el) el.textContent = count + ' selected';
+  var btn = document.querySelector('.picker-multi-confirm');
+  if (btn) btn.style.opacity = count > 0 ? '1' : '0.4';
+}
+
+function confirmMultiSelect() {
+  var doneIds = {};
+  plannedExercises.forEach(function(m){ doneIds[m.id] = true; });
+  Object.values(multiSelected).forEach(function(m) {
+    if (!doneIds[m.id]) plannedExercises.push(m);
+  });
+  renderPlanList();
+  document.getElementById('picker-overlay').classList.remove('open');
+}
+
+function filterPlanPickerList() {
+  var term = (document.getElementById('picker-search').value || '').toLowerCase();
+  buildPlanPickerItems(term);
 }
 
 function startPlannedWorkout() {
@@ -2625,6 +2722,10 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
       <input id="picker-search" type="text" placeholder="🔍 Search exercise..." oninput="filterPickerList()" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 12px;color:var(--text);font-size:14px;font-family:'Barlow',sans-serif;outline:none;">
     </div>
     <div class="picker-list" id="picker-list"></div>
+    <div class="picker-multi-bar" id="picker-multi-bar" style="display:none;">
+      <span class="picker-multi-count" id="picker-multi-count">0 selected</span>
+      <button class="picker-multi-confirm" onclick="confirmMultiSelect()">Add selected →</button>
+    </div>
   </div>
 </div>
 
@@ -2951,6 +3052,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
       <div class="manual-h2">Modifying the plan</div>
       <div class="manual-bullet">Tap <b>✕</b> to remove an exercise</div>
       <div class="manual-bullet">Tap <b>⊕ Add exercise</b> to add one from your library (searchable, alphabetical)</div>
+      <div class="manual-bullet">In <b>Manual mode</b>, the picker opens with multi-select — tap as many exercises as you want, then tap <b>Add selected →</b> to add them all at once</div>
 
       <div class="manual-h2">Customize & Regenerate</div>
       <p class="manual-p">Type a request (e.g. <i>"more upper body"</i>, <i>"focus on chest"</i>) and tap <b>↺ Regenerate</b> to get a new list instantly.</p>
@@ -2973,7 +3075,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
       <div class="manual-bullet">When all sets are done, the next exercise loads automatically</div>
 
       <div class="manual-h2">Postpone & Skip</div>
-      <div class="manual-bullet"><b>⏭ Postpone</b> — machine busy? Sends exercise to end of queue, comes back later</div>
+      <div class="manual-bullet"><b>⏭ Postpone</b> — machine busy? Removes the exercise from the immediate queue and adds it at the end. The app moves to the next exercise right away. The postponed exercise comes back when all others are completed.</div>
       <div class="manual-bullet"><b>✕ Skip</b> — permanently skips the exercise for this session</div>
 
       <div class="manual-h2">Recovery Timer</div>
