@@ -2077,10 +2077,13 @@ function startAIWorkout(ids) {
 
 function exportData() {
   var data = {
-    version: 1,
+    version: 2,
     exportedAt: new Date().toISOString(),
     machines: machines,
-    sessions: sessionHistory
+    sessions: sessionHistory,
+    plans: workoutPlans,
+    profile: userProfile,
+    bodyweight: bodyWeightLog
   };
   var blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   var url = URL.createObjectURL(blob);
@@ -2099,12 +2102,19 @@ function importData(event) {
     try {
       var data = JSON.parse(e.target.result);
       if (!data.machines || !data.sessions) throw new Error('Invalid file');
-      if (confirm('This will replace your current data. Continue?')) {
+      if (confirm('This will replace ALL your current data (exercises, sessions, plans, profile). Continue?')) {
         machines = data.machines;
         sessionHistory = data.sessions;
+        if (data.plans) workoutPlans = data.plans;
+        if (data.profile) userProfile = data.profile;
+        if (data.bodyweight) bodyWeightLog = data.bodyweight;
         await saveMachines();
         await saveHistory();
+        await savePlansStorage();
+        try { localStorage.setItem('gymcoach_profile', JSON.stringify(userProfile)); } catch(e) {}
+        try { localStorage.setItem('gymcoach_bodyweight', JSON.stringify(bodyWeightLog)); } catch(e) {}
         updateHomeStats();
+        updateHomeGreeting();
         renderHistory();
         alert('Data imported successfully!');
       }
