@@ -409,6 +409,74 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
   font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:15px;
   letter-spacing:1px; text-transform:uppercase; padding:10px 20px;
   border-radius:99px; cursor:pointer; }
+
+/* PLANS SCREEN */
+.plan-card { background:var(--surface); border:1.5px solid var(--border); border-radius:16px;
+  margin-bottom:12px; overflow:hidden; }
+.plan-card-header { display:flex; align-items:center; justify-content:space-between;
+  padding:14px 16px; cursor:pointer; }
+.plan-card-name { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:800;
+  color:var(--text); }
+.plan-card-meta { font-size:12px; color:var(--text3); margin-top:2px; }
+.plan-card-actions { display:flex; gap:8px; align-items:center; }
+.plan-card-arrow { font-size:13px; color:var(--text3); transition:transform 0.2s; }
+.plan-card.open .plan-card-arrow { transform:rotate(180deg); }
+.plan-card-body { display:none; border-top:1px solid var(--border); }
+.plan-card.open .plan-card-body { display:block; }
+.plan-list-item { display:flex; align-items:center; justify-content:space-between;
+  padding:12px 16px; border-bottom:1px solid var(--border); gap:10px; }
+.plan-list-item:last-child { border-bottom:none; }
+.plan-list-info { flex:1; min-width:0; }
+.plan-list-name { font-size:14px; font-weight:700; color:var(--text); }
+.plan-list-excount { font-size:12px; color:var(--text3); margin-top:2px; }
+.plan-start-btn { background:var(--accent); color:#0d0d0d; border:none;
+  font-family:'Barlow Condensed',sans-serif; font-weight:800; font-size:13px;
+  letter-spacing:0.5px; text-transform:uppercase; padding:8px 14px;
+  border-radius:99px; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+.plan-del-btn { background:none; border:none; color:var(--text3); font-size:18px;
+  cursor:pointer; padding:2px 4px; line-height:1; flex-shrink:0; }
+.plan-del-btn:hover { color:var(--red); }
+
+/* CREATE/EDIT PLAN SCREEN */
+.list-editor { background:var(--surface2); border:1px solid var(--border);
+  border-radius:12px; padding:12px; margin-bottom:10px; }
+.list-editor-header { display:flex; align-items:center; gap:8px; margin-bottom:10px; }
+.list-editor-name { flex:1; background:var(--bg); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px; color:var(--text); font-size:14px;
+  font-family:'Barlow',sans-serif; outline:none; }
+.list-editor-name:focus { border-color:var(--accent); }
+.list-ex-tag { display:inline-flex; align-items:center; gap:4px; background:var(--surface);
+  border:1px solid var(--border); border-radius:99px; padding:4px 10px;
+  font-size:12px; color:var(--text); margin:3px; }
+.list-ex-tag button { background:none; border:none; color:var(--text3); cursor:pointer;
+  font-size:12px; padding:0; line-height:1; margin-left:2px; }
+.list-ex-tag button:hover { color:var(--red); }
+.add-list-btn { width:100%; background:none; border:1px dashed rgba(218,119,86,0.4);
+  color:var(--accent); font-size:13px; padding:10px; border-radius:10px;
+  cursor:pointer; font-family:'Barlow',sans-serif; margin-top:4px; }
+
+/* SESSION QUEUE */
+.queue-progress-bar { height:4px; background:var(--border); border-radius:99px; margin-bottom:1rem; overflow:hidden; }
+.queue-progress-fill { height:100%; background:linear-gradient(90deg,#DA7756,#F5C97A); border-radius:99px; transition:width 0.4s ease; }
+.queue-ex-item { display:flex; align-items:center; gap:12px; background:var(--surface);
+  border:1.5px solid var(--border); border-radius:14px; padding:12px 14px;
+  margin-bottom:8px; cursor:pointer; transition:border-color 0.15s, transform 0.1s; }
+.queue-ex-item:active { transform:scale(0.98); }
+.queue-ex-item:hover { border-color:var(--accent); }
+.queue-ex-icon { width:44px; height:44px; border-radius:10px; background:var(--surface2);
+  display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.queue-ex-icon svg { width:30px; height:30px; }
+.queue-ex-info { flex:1; min-width:0; }
+.queue-ex-name { font-size:15px; font-weight:600; color:var(--text); }
+.queue-ex-meta { font-size:12px; color:var(--text3); margin-top:2px; }
+.queue-ex-weight { font-family:'Barlow Condensed',sans-serif; font-size:16px; font-weight:700;
+  color:var(--accent2); white-space:nowrap; flex-shrink:0; }
+.queue-ex-arrow { font-size:16px; color:var(--text3); flex-shrink:0; }
+.queue-stats { display:flex; gap:8px; margin-bottom:1rem; }
+.queue-stat { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:8px; text-align:center; }
+.queue-stat-val { font-family:'Barlow Condensed',sans-serif; font-size:20px; font-weight:800; color:var(--accent); }
+.queue-stat-lbl { font-size:10px; color:var(--text3); text-transform:uppercase; letter-spacing:0.5px; }
 </style>
 </head>
 <body>
@@ -468,16 +536,21 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
     <div style="display:flex;align-items:center;justify-content:center;margin-bottom:2px;">
       <span style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1.5px;font-weight:600;">Start new session</span>
     </div>
-    <div style="display:flex;gap:10px;">
-      <button onclick="openPlanningScreen()" style="flex:1;background:linear-gradient(135deg,#DA7756,#c4623d);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:15px 10px;border-radius:14px;cursor:pointer;box-shadow:0 4px 20px rgba(218,119,86,0.35);display:flex;flex-direction:column;align-items:center;gap:4px;">
-        <span style="font-size:22px;">🤖</span>
+    <div style="display:flex;gap:8px;">
+      <button onclick="openPlanningScreen()" style="flex:1;background:linear-gradient(135deg,#DA7756,#c4623d);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;padding:13px 8px;border-radius:14px;cursor:pointer;box-shadow:0 4px 20px rgba(218,119,86,0.35);display:flex;flex-direction:column;align-items:center;gap:3px;">
+        <span style="font-size:20px;">🤖</span>
         <span>AI</span>
-        <span style="font-size:10px;opacity:0.7;font-weight:600;">Auto plan</span>
+        <span style="font-size:9px;opacity:0.7;font-weight:600;">Auto plan</span>
       </button>
-      <button onclick="openManualSession()" style="flex:1;background:var(--surface);color:var(--text);border:1.5px solid var(--border2);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:15px 10px;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;">
-        <span style="font-size:22px;">✏️</span>
+      <button onclick="openManualSession()" style="flex:1;background:var(--surface);color:var(--text);border:1.5px solid var(--border2);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;padding:13px 8px;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;">
+        <span style="font-size:20px;">✏️</span>
         <span>Manual</span>
-        <span style="font-size:10px;color:var(--text3);font-weight:600;">I choose</span>
+        <span style="font-size:9px;color:var(--text3);font-weight:600;">I choose</span>
+      </button>
+      <button onclick="goTo('plans-screen')" style="flex:1;background:var(--surface);color:var(--text);border:1.5px solid rgba(245,201,122,0.35);font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:1px;text-transform:uppercase;padding:13px 8px;border-radius:14px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;">
+        <span style="font-size:20px;">📋</span>
+        <span>Plans</span>
+        <span style="font-size:9px;color:var(--accent2);font-weight:600;">My lists</span>
       </button>
     </div>
     <button onclick="goTo('manual-screen')" style="width:100%;background:none;border:1px solid var(--border);color:var(--text3);font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:13px;letter-spacing:1px;text-transform:uppercase;padding:10px;border-radius:99px;cursor:pointer;">📖 User Manual</button>
@@ -782,6 +855,7 @@ function goTo(id) {
   if (id === 'stats-screen') renderStats();
   if (id === 'profile-screen') renderProfileScreen();
   if (id === 'home') updateHomeStats();
+  if (id === 'plans-screen') renderPlansScreen();
 }
 
 // ── ICONS ──
@@ -1342,8 +1416,8 @@ function startWorkout() {
   currentSeries = 0; completedLog = []; exerciseCount = 0;
   document.getElementById('log-list').innerHTML = '';
   document.getElementById('log-section').style.display = 'none';
-  goTo('workout-screen');
-  loadNextExercise();
+  renderQueueScreen();
+  goTo('queue-screen');
 }
 
 function getLastWeight(machineName) {
@@ -1432,15 +1506,19 @@ function renderDots(n) {
 function skipExercise() {
   if (!currentMachine) return;
   completedLog.push({ id: currentMachine.id, name: currentMachine.name, series: 0, reps: currentMachine.reps, weight: currentMachine.weight || 0, skipped: true });
-  setTimeout(loadNextExercise, 100);
+  currentMachine = null;
+  renderQueueScreen();
+  var remaining = getQueueRemaining();
+  if (remaining.length === 0) finishWorkout();
+  else goTo('queue-screen');
 }
 
 function postponeExercise() {
   if (!currentMachine) return;
-  // Add to postponed list — will be re-proposed after other exercises
   postponedMachines.push(currentMachine);
-  // Move on without marking as done or skipped
-  setTimeout(loadNextExercise, 100);
+  currentMachine = null;
+  renderQueueScreen();
+  goTo('queue-screen');
 }
 
 function completeSetss() {
@@ -1463,7 +1541,16 @@ function completeSetss() {
   } else {
     completedLog.push({ id: ex.id, name: ex.name, series: ex.series, reps: ex.reps, weight: ex.weight || 0 });
     addToLog(ex);
-    setTimeout(loadNextExercise, 300);
+    // Return to queue — remove completed exercise and re-render
+    setTimeout(function() {
+      renderQueueScreen();
+      var remaining = getQueueRemaining();
+      if (remaining.length === 0) {
+        finishWorkout();
+      } else {
+        goTo('queue-screen');
+      }
+    }, 400);
   }
 }
 
@@ -2707,8 +2794,362 @@ function regeneratePlan() {
   if (desc && prompt) desc.innerHTML = 'Regenerated based on: <span style="color:var(--accent2);">"' + esc(prompt) + '"</span>';
 }
 
+
+// ── WORKOUT PLANS ──
+var workoutPlans = []; // [{id, name, lists:[{id, name, exerciseIds:[]}]}]
+var editingPlanId = null; // null = new plan
+var listEditorData = []; // [{id, name, exerciseIds:[]}]
+var currentListEditorIdx = -1; // which list is being populated via picker
+
+async function loadPlans() {
+  try { var p = localStorage.getItem('gymcoach_plans'); if (p) workoutPlans = JSON.parse(p); } catch(e) {}
+}
+
+async function savePlansStorage() {
+  try { localStorage.setItem('gymcoach_plans', JSON.stringify(workoutPlans)); } catch(e) {}
+}
+
+function renderPlansScreen() {
+  var list = document.getElementById('plans-list');
+  var empty = document.getElementById('plans-empty');
+  list.innerHTML = '';
+  if (!workoutPlans.length) { empty.style.display = 'block'; return; }
+  empty.style.display = 'none';
+  workoutPlans.forEach(function(plan) {
+    var card = document.createElement('div');
+    card.className = 'plan-card';
+    var totalEx = plan.lists.reduce(function(a,l){ return a + l.exerciseIds.length; }, 0);
+    card.innerHTML =
+      '<div class="plan-card-header">' +
+        '<div>' +
+          '<div class="plan-card-name">' + esc(plan.name) + '</div>' +
+          '<div class="plan-card-meta">' + plan.lists.length + ' list' + (plan.lists.length!==1?'s':'') + ' · ' + totalEx + ' exercises</div>' +
+        '</div>' +
+        '<div class="plan-card-actions">' +
+          '<button class="plan-del-btn" data-id="' + plan.id + '" title="Edit">✏️</button>' +
+          '<span class="plan-card-arrow">▼</span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="plan-card-body">' +
+        plan.lists.map(function(lst) {
+          var exNames = lst.exerciseIds.map(function(id) {
+            var m = machines.find(function(m){ return m.id === id; });
+            return m ? m.name : '?';
+          });
+          return '<div class="plan-list-item">' +
+            '<div class="plan-list-info">' +
+              '<div class="plan-list-name">' + esc(lst.name) + '</div>' +
+              '<div class="plan-list-excount">' + exNames.join(', ') + '</div>' +
+            '</div>' +
+            '<button class="plan-start-btn" data-planid="' + plan.id + '" data-listid="' + lst.id + '">▶ Start</button>' +
+          '</div>';
+        }).join('') +
+      '</div>';
+    // Toggle open/close
+    card.querySelector('.plan-card-header').addEventListener('click', function(e) {
+      if (e.target.classList.contains('plan-del-btn')) return;
+      if (e.target.classList.contains('plan-start-btn')) return;
+      card.classList.toggle('open');
+    });
+    // Edit button
+    card.querySelector('.plan-del-btn').addEventListener('click', function() {
+      openEditPlan(plan.id);
+    });
+    // Start buttons
+    card.querySelectorAll('.plan-start-btn').forEach(function(btn) {
+      btn.addEventListener('click', function(e) {
+        e.stopPropagation();
+        startPlanList(btn.dataset.planid, btn.dataset.listid);
+      });
+    });
+    list.appendChild(card);
+  });
+}
+
+function startPlanList(planId, listId) {
+  var plan = workoutPlans.find(function(p){ return String(p.id) === String(planId); });
+  if (!plan) return;
+  var lst = plan.lists.find(function(l){ return String(l.id) === String(listId); });
+  if (!lst) return;
+  var exList = lst.exerciseIds.map(function(id){ return machines.find(function(m){ return m.id === id; }); }).filter(Boolean);
+  if (!exList.length) { alert('This list has no exercises!'); return; }
+  aiWorkoutQueue = exList.slice();
+  aiWorkoutActive = true;
+  startWorkout();
+}
+
+function openCreatePlan() {
+  editingPlanId = null;
+  listEditorData = [{ id: Date.now(), name: 'List A', exerciseIds: [] }];
+  document.getElementById('new-plan-name').value = '';
+  document.getElementById('create-plan-title').textContent = 'New Plan';
+  renderListsEditor();
+  goTo('create-plan-screen');
+}
+
+function openEditPlan(planId) {
+  var plan = workoutPlans.find(function(p){ return p.id === planId; });
+  if (!plan) return;
+  editingPlanId = planId;
+  listEditorData = plan.lists.map(function(l){ return { id:l.id, name:l.name, exerciseIds:l.exerciseIds.slice() }; });
+  document.getElementById('new-plan-name').value = plan.name;
+  document.getElementById('create-plan-title').textContent = 'Edit Plan';
+  renderListsEditor();
+  goTo('create-plan-screen');
+}
+
+function renderListsEditor() {
+  var container = document.getElementById('lists-editor');
+  container.innerHTML = '';
+  listEditorData.forEach(function(lst, idx) {
+    var div = document.createElement('div');
+    div.className = 'list-editor';
+    var exNames = lst.exerciseIds.map(function(id){
+      var m = machines.find(function(m){ return m.id === id; });
+      return m ? m.name : null;
+    }).filter(Boolean);
+    div.innerHTML =
+      '<div class="list-editor-header">' +
+        '<input class="list-editor-name" value="' + esc(lst.name) + '" placeholder="List name" data-idx="' + idx + '">' +
+        '<button onclick="removeListEditor(' + idx + ')" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;flex-shrink:0;">✕</button>' +
+      '</div>' +
+      '<div id="list-tags-' + idx + '">' +
+        exNames.map(function(name, ei) {
+          return '<span class="list-ex-tag">' + esc(name) + '<button onclick="removeExFromList(' + idx + ',' + lst.exerciseIds[ei] + ')">✕</button></span>';
+        }).join('') +
+      '</div>' +
+      '<button onclick="openPickerForList(' + idx + ')" style="margin-top:8px;background:none;border:1px dashed var(--border);color:var(--text3);font-size:12px;padding:6px 12px;border-radius:8px;cursor:pointer;width:100%;">⊕ Add exercises</button>';
+    div.querySelector('.list-editor-name').addEventListener('input', function() {
+      listEditorData[this.dataset.idx].name = this.value;
+    });
+    container.appendChild(div);
+  });
+}
+
+function addListEditor() {
+  var letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  var name = 'List ' + (letters[listEditorData.length] || (listEditorData.length + 1));
+  listEditorData.push({ id: Date.now(), name: name, exerciseIds: [] });
+  renderListsEditor();
+}
+
+function removeListEditor(idx) {
+  if (listEditorData.length <= 1) { alert('A plan needs at least one list.'); return; }
+  listEditorData.splice(idx, 1);
+  renderListsEditor();
+}
+
+function removeExFromList(listIdx, exId) {
+  var lst = listEditorData[listIdx];
+  lst.exerciseIds = lst.exerciseIds.filter(function(id){ return id !== exId; });
+  renderListsEditor();
+}
+
+function openPickerForList(listIdx) {
+  currentListEditorIdx = listIdx;
+  // Use multi-select picker
+  multiSelectMode = true;
+  multiSelected = {};
+  // Pre-select already added exercises
+  var lst = listEditorData[listIdx];
+  lst.exerciseIds.forEach(function(id) {
+    var m = machines.find(function(m){ return m.id === id; });
+    if (m) multiSelected[id] = m;
+  });
+  var list = document.getElementById('picker-list');
+  var searchEl = document.getElementById('picker-search');
+  var multiBar = document.getElementById('picker-multi-bar');
+  if (searchEl) { searchEl.value = ''; searchEl.oninput = function(){ buildListPickerItems(searchEl.value); }; }
+  if (multiBar) {
+    multiBar.style.display = 'flex';
+    // Override confirm action for list editor
+    var btn = multiBar.querySelector('.picker-multi-confirm');
+    if (btn) {
+      btn.onclick = confirmListPickerSelect;
+    }
+  }
+  updateMultiCount();
+  buildListPickerItems('');
+  document.getElementById('picker-overlay').classList.add('open');
+}
+
+function buildListPickerItems(term) {
+  var list = document.getElementById('picker-list');
+  var t = (term || '').toLowerCase();
+  list.innerHTML = '';
+  var sorted = machines.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  sorted.forEach(function(m) {
+    if (t && m.name.toLowerCase().indexOf(t) === -1) return;
+    var isSelected = !!multiSelected[m.id];
+    var div = document.createElement('div');
+    div.className = 'picker-item' + (isSelected ? ' selected' : '');
+    div.innerHTML =
+      '<div class="picker-icon">' + getMachineIcon(m.name) + '</div>' +
+      '<div class="picker-info">' +
+        '<div class="picker-name">' + esc(m.name) + '</div>' +
+        '<div class="picker-meta">' + m.series + ' sets · ' + m.reps + '</div>' +
+      '</div>';
+    div.addEventListener('click', function() {
+      if (multiSelected[m.id]) { delete multiSelected[m.id]; div.classList.remove('selected'); }
+      else { multiSelected[m.id] = m; div.classList.add('selected'); }
+      updateMultiCount();
+    });
+    list.appendChild(div);
+  });
+}
+
+function confirmListPickerSelect() {
+  if (currentListEditorIdx >= 0) {
+    listEditorData[currentListEditorIdx].exerciseIds = Object.keys(multiSelected).map(Number);
+    renderListsEditor();
+  }
+  document.getElementById('picker-overlay').classList.remove('open');
+  // Restore normal confirm action
+  var btn = document.querySelector('.picker-multi-confirm');
+  if (btn) btn.onclick = confirmMultiSelect;
+}
+
+async function savePlan() {
+  var name = document.getElementById('new-plan-name').value.trim();
+  if (!name) { alert('Enter a plan name.'); return; }
+  var validLists = listEditorData.filter(function(l){ return l.exerciseIds.length > 0; });
+  if (!validLists.length) { alert('Add at least one exercise to a list.'); return; }
+  if (editingPlanId) {
+    var idx = workoutPlans.findIndex(function(p){ return p.id === editingPlanId; });
+    if (idx !== -1) workoutPlans[idx] = { id: editingPlanId, name: name, lists: validLists };
+  } else {
+    workoutPlans.push({ id: Date.now(), name: name, lists: validLists });
+  }
+  await savePlansStorage();
+  renderPlansScreen();
+  goTo('plans-screen');
+}
+
+async function deletePlan(planId) {
+  if (!confirm('Delete this plan?')) return;
+  workoutPlans = workoutPlans.filter(function(p){ return p.id !== planId; });
+  await savePlansStorage();
+  renderPlansScreen();
+}
+
+
+// ── SESSION QUEUE ──
+function getQueueRemaining() {
+  var doneIds = {};
+  completedLog.forEach(function(e){ doneIds[e.id] = true; });
+  var all = aiWorkoutActive ? aiWorkoutQueue : machines.filter(function(m){ return isMachineAllowed(m.name); });
+  // remaining = not done, includes postponed
+  var remaining = all.filter(function(m){ return !doneIds[m.id]; });
+  // Add postponed at end if not already in remaining
+  postponedMachines.forEach(function(m){
+    if (!doneIds[m.id] && !remaining.find(function(r){ return r.id === m.id; })) remaining.push(m);
+  });
+  return remaining;
+}
+
+function renderQueueScreen() {
+  var doneIds = {};
+  completedLog.forEach(function(e){ if (!e.skipped) doneIds[e.id] = true; });
+  var remaining = getQueueRemaining();
+  var total = Object.keys(doneIds).length + remaining.length;
+  var doneCount = Object.keys(doneIds).length;
+  var pct = total > 0 ? Math.round(doneCount / total * 100) : 0;
+
+  // Progress
+  var fill = document.getElementById('queue-progress-fill');
+  if (fill) fill.style.width = pct + '%';
+
+  // Stats
+  var vol = completedLog.reduce(function(a,e){
+    return a + (e.skipped ? 0 : e.series * getRepsNum(e.reps) * (e.weight||0));
+  }, 0);
+  var qd = document.getElementById('queue-done-count');
+  var ql = document.getElementById('queue-left-count');
+  var qv = document.getElementById('queue-vol-count');
+  if (qd) qd.textContent = doneCount;
+  if (ql) ql.textContent = remaining.length;
+  if (qv) qv.textContent = vol > 0 ? Math.round(vol) : '—';
+
+  // Title
+  var title = document.getElementById('queue-title');
+  if (title) title.textContent = remaining.length > 0 ? 'Tap to start exercise' : 'All done!';
+
+  // List
+  var list = document.getElementById('queue-list');
+  if (!list) return;
+  list.innerHTML = '';
+
+  var postponedIds = {};
+  postponedMachines.forEach(function(m){ postponedIds[m.id] = true; });
+
+  remaining.forEach(function(m) {
+    var w = getLastWeight(m.name);
+    var isPostponed = !!postponedIds[m.id];
+    var item = document.createElement('div');
+    item.className = 'queue-ex-item';
+    item.innerHTML =
+      '<div class="queue-ex-icon">' + getMachineIcon(m.name) + '</div>' +
+      '<div class="queue-ex-info">' +
+        '<div class="queue-ex-name">' + esc(m.name) +
+          (isPostponed ? '<span style="font-size:10px;color:var(--accent2);margin-left:6px;font-weight:600;">postponed</span>' : '') +
+        '</div>' +
+        '<div class="queue-ex-meta">' + m.series + ' sets · ' + m.reps + ' reps' +
+          (m.muscles && m.muscles.length ? ' · ' + m.muscles.slice(0,2).join(', ') : '') +
+        '</div>' +
+      '</div>' +
+      (w > 0 ? '<span class="queue-ex-weight">' + w + ' kg</span>' : '') +
+      '<span class="queue-ex-arrow">▶</span>';
+
+    item.addEventListener('click', function() {
+      launchExercise(m);
+    });
+    list.appendChild(item);
+  });
+
+  // If empty, show finish button
+  if (remaining.length === 0) {
+    var finBtn = document.createElement('button');
+    finBtn.className = 'btn-primary';
+    finBtn.textContent = '✓ Finish session';
+    finBtn.style.marginTop = '1rem';
+    finBtn.addEventListener('click', finishWorkout);
+    list.appendChild(finBtn);
+  }
+}
+
+function launchExercise(m) {
+  currentMachine = m;
+  currentSeries = 0;
+  exerciseCount++;
+  var ex = m;
+  document.getElementById('ex-counter').textContent = 'Exercise ' + exerciseCount;
+  document.getElementById('ex-name').textContent = ex.name;
+  document.getElementById('ex-series-pill').textContent = ex.series + ' sets';
+  document.getElementById('ex-reps-pill').textContent = ex.reps + ' reps';
+  document.getElementById('muscle-tags').innerHTML = (ex.muscles||[]).map(function(mu){ return '<span class="muscle-tag">' + esc(mu) + '</span>'; }).join('');
+  var w = getLastWeight(ex.name);
+  if (w > 0 && (!ex.weight || ex.weight === 0)) {
+    ex.weight = w;
+    var idx = -1;
+    for (var i=0;i<machines.length;i++){ if(machines[i].id===ex.id){idx=i;break;} }
+    if (idx !== -1) machines[idx].weight = w;
+    saveMachines();
+  }
+  document.getElementById('weight-display').textContent = w > 0 ? w : '—';
+  document.getElementById('weight-input').value = w > 0 ? w : '';
+  document.getElementById('weight-hint').textContent = w > 0 ? 'Last used weight: ' + w + ' kg' : 'No weight — enter it';
+  setExIcon(ex.name);
+  var aiContent = document.getElementById('ai-content');
+  aiContent.style.display = 'none';
+  aiContent.textContent = getCoachTip(ex.name, w);
+  document.getElementById('ai-toggle').textContent = '▼ show';
+  renderDots(ex.series);
+  document.getElementById('btn-done').textContent = '✓ Complete set 1';
+  goTo('workout-screen');
+}
+
 function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-(async function() { await load(); await loadProfile(); updateHomeStats(); document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); })();
+(async function() { await load(); await loadProfile(); await loadPlans(); updateHomeStats(); document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'}); })();
 </script>
 
 <!-- EXERCISE PICKER -->
@@ -3040,7 +3481,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
     <!-- 4 PLANNING -->
     <div class="manual-section">
       <div class="manual-h1">4. Review & Edit</div>
-      <p class="manual-p">Before every session the AI generates 10 personalised exercises based on your history.</p>
+      <p class="manual-p">Before every AI or Manual session, you can review and edit your exercise list. Plans start directly without this screen.</p>
 
       <div class="manual-h2">How the AI selects exercises</div>
       <div class="manual-bullet">Groups trained recently get lower priority</div>
@@ -3062,7 +3503,27 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
     <!-- 5 WORKOUT -->
     <div class="manual-section">
-      <div class="manual-h1">5. Workout Screen</div>
+      <div class="manual-h1">5. Session Queue</div>
+      <p class="manual-p">After confirming your plan, the app shows the <b>Session Queue</b> — a list of all exercises for this session. You choose which exercise to do and when, based on machine availability.</p>
+
+      <div class="manual-h2">Queue overview</div>
+      <div class="manual-bullet">A progress bar at the top shows how far through the session you are</div>
+      <div class="manual-bullet">Three counters: <b>Done</b> (exercises completed), <b>Remaining</b> (still to do), <b>Vol. kg</b> (total volume accumulated: sets × reps × kg)</div>
+      <div class="manual-bullet">Each exercise shows its icon, name, sets × reps, muscles, and last saved weight</div>
+
+      <div class="manual-h2">Starting an exercise</div>
+      <p class="manual-p">Tap any exercise in the list to open the workout screen for that exercise. The machine must be free — you decide the order.</p>
+
+      <div class="manual-h2">After completing an exercise</div>
+      <p class="manual-p">When all sets are done, the app automatically returns to the Session Queue. The completed exercise disappears from the list.</p>
+
+      <div class="manual-h2">Finishing the session</div>
+      <div class="manual-bullet">Tap <b>Finish ✓</b> in the top bar at any time to end and save the session</div>
+      <div class="manual-bullet">When the last exercise is completed, the session ends automatically</div>
+    </div>
+
+    <div class="manual-section">
+      <div class="manual-h1">6. Workout Screen</div>
 
       <div class="manual-h2">Exercise Card</div>
       <p class="manual-p">Shows exercise name, sets, reps, and muscle tags. Tap <b>▼ Coach AI</b> for expert technique notes personalised to your current weight.</p>
@@ -3072,27 +3533,24 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
       <div class="manual-h2">Completing Sets</div>
       <div class="manual-bullet">Tap <b>✓ Complete set N</b> — the dot turns green</div>
-      <div class="manual-bullet">When all sets are done, the next exercise loads automatically</div>
+      <div class="manual-bullet">When all sets are done, you return to the Session Queue automatically</div>
 
       <div class="manual-h2">Postpone & Skip</div>
-      <div class="manual-bullet"><b>⏭ Postpone</b> — machine busy? Removes the exercise from the immediate queue and adds it at the end. The app moves to the next exercise right away. The postponed exercise comes back when all others are completed.</div>
-      <div class="manual-bullet"><b>✕ Skip</b> — permanently skips the exercise for this session</div>
+      <div class="manual-bullet"><b>⏭ Postpone</b> — machine busy mid-exercise? Returns you to the Queue and moves this exercise to the bottom of the list with a "postponed" tag. It reappears when all others are done.</div>
+      <div class="manual-bullet"><b>✕ Skip</b> — removes the exercise permanently from this session and returns to Queue</div>
 
       <div class="manual-h2">Recovery Timer</div>
       <p class="manual-p">Tap <b>⏱ Start Recovery Timer</b>. Default is 90 seconds. Use − / + to adjust in 15s steps. Phone vibrates when time is up.</p>
 
       <div class="manual-h2">Choose Exercise</div>
-      <p class="manual-p">Tap <b>⊕ Choose exercise</b> at any time to manually pick a different exercise. Search field + alphabetical list.</p>
-
-      <div class="manual-h2">Finish</div>
-      <p class="manual-p">Tap <b>Finish ✓</b> in the top bar to end and save the session.</p>
+      <p class="manual-p">Tap <b>⊕ Choose exercise</b> to manually pick a different exercise from your library. Search field + alphabetical list.</p>
     </div>
 
     <hr class="manual-divider">
 
     <!-- 6 DONE -->
     <div class="manual-section">
-      <div class="manual-h1">6. Session Complete</div>
+      <div class="manual-h1">7. Session Complete</div>
       <p class="manual-p">Summary shows exercises completed, total sets, and volume in tons (sets × reps × kg ÷ 1000). A <b>🏆 PR badge</b> appears next to any exercise where you set a new personal record.</p>
     </div>
 
@@ -3100,7 +3558,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
     <!-- 7 HISTORY -->
     <div class="manual-section">
-      <div class="manual-h1">7. History</div>
+      <div class="manual-h1">8. History</div>
       <p class="manual-p">A <b>line chart</b> at the top shows weight progression for a selected exercise. Below, each session card shows date, time, exercises, sets, and volume. Tap to expand and see details.</p>
       <div class="manual-bullet">Tap <b>🗑 Delete session</b> to remove a session permanently</div>
       <div class="manual-bullet"><b>⬆ Export</b> — download a JSON backup of all your data</div>
@@ -3112,7 +3570,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
     <!-- 8 STATS -->
     <div class="manual-section">
-      <div class="manual-h1">8. Statistics</div>
+      <div class="manual-h1">9. Statistics</div>
       <div class="manual-bullet"><b>🔥 Week streak</b> — consecutive weeks with at least one session</div>
       <div class="manual-bullet"><b>💪 Sessions</b> — total sessions completed</div>
       <div class="manual-bullet"><b>⚡ Total tons</b> — cumulative volume</div>
@@ -3126,7 +3584,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
     <!-- 9 PROFILE -->
     <div class="manual-section">
-      <div class="manual-h1">9. Profile</div>
+      <div class="manual-h1">10. Profile</div>
 
       <div class="manual-h2">Personal Info</div>
       <p class="manual-p">Name (used for home screen greeting), age, gender, height, weight, training goal, sessions/week target, target weight, and physical limitations.</p>
@@ -3146,7 +3604,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
     <!-- 10 EXERCISES -->
     <div class="manual-section">
-      <div class="manual-h1">10. Exercises</div>
+      <div class="manual-h1">11. Exercises</div>
       <p class="manual-p">Add custom exercises with name, sets, reps, weight, and muscles. Tap <b>✕</b> to delete. The app comes with 50 pre-loaded exercises covering machines and cables.</p>
     </div>
 
@@ -3154,7 +3612,7 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
     <!-- 11 DATA -->
     <div class="manual-section">
-      <div class="manual-h1">11. Data & Privacy</div>
+      <div class="manual-h1">12. Data & Privacy</div>
       <p class="manual-p">All data is stored locally on your device. Nothing is sent to any server.</p>
       <div class="manual-warn"><b>⚠ Note:</b> Clearing Safari cache will erase all app data. Keep regular Export backups to protect your history.</div>
     </div>
@@ -3163,7 +3621,33 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
 
     <!-- 12 TIPS -->
     <div class="manual-section">
-      <div class="manual-h1">12. Tips & Best Practices</div>
+      <div class="manual-h1">12. Workout Plans</div>
+      <p class="manual-p">Workout Plans let you create and save custom exercise lists that you can reuse in any session. Ideal for structured programs like Push/Pull/Legs or Full Body A/B/C.</p>
+
+      <div class="manual-h2">Accessing Plans</div>
+      <div class="manual-bullet">Tap <b>📋 Plans</b> from the home screen Start New Session area</div>
+      <div class="manual-bullet">Or navigate directly from the Plans screen in the app</div>
+
+      <div class="manual-h2">Creating a Plan</div>
+      <div class="manual-bullet">Tap <b>＋ New plan</b> and give it a name (e.g. "Full Body", "Push Day")</div>
+      <div class="manual-bullet">Add one or more lists — they are named automatically (List A, List B...) but you can rename them</div>
+      <div class="manual-bullet">For each list, tap <b>⊕ Add exercises</b> — the multi-select picker opens. Tap all the exercises you want and tap <b>Add selected →</b></div>
+      <div class="manual-bullet">Tap <b>Save</b> to store the plan</div>
+
+      <div class="manual-h2">Using a Plan</div>
+      <div class="manual-bullet">Tap <b>📋 Plans</b> from the home screen</div>
+      <div class="manual-bullet">Tap a plan card to expand it and see its lists</div>
+      <div class="manual-bullet">Tap <b>▶ Start</b> next to a list — the session begins immediately with the Session Queue</div>
+
+      <div class="manual-h2">Editing & Deleting</div>
+      <div class="manual-bullet">Tap ✏️ on a plan card to edit its name, lists, and exercises</div>
+      <div class="manual-bullet">Remove individual exercises from a list by tapping ✕ next to them</div>
+      <div class="manual-bullet">Delete an entire list with ✕ on the list header</div>
+      <div class="manual-tip"><b>💡 Tip:</b> Plans are perfect for gym programs with rotating days. Create "Full Body A" and "Full Body B" and alternate between them each session.</div>
+    </div>
+
+    <div class="manual-section">
+      <div class="manual-h1">13. Tips & Best Practices</div>
       <div class="manual-bullet">Log your weight for every exercise — helps the AI improve suggestions over time</div>
       <div class="manual-bullet">Update your profile goal and conditions whenever your situation changes</div>
       <div class="manual-bullet">Export your data at least once a week if you train frequently</div>
@@ -3178,6 +3662,69 @@ function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').re
       ⚡ Gym Coach — built with care for your training<br>by Pasquale Cataldo
     </div>
 
+  </div>
+</div>
+
+
+<!-- PLANS SCREEN -->
+<div id="plans-screen" class="screen">
+  <div class="top-bar">
+    <h2>📋 My Plans</h2>
+    <button onclick="openCreatePlan()" style="background:var(--accent);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;padding:7px 16px;border-radius:99px;cursor:pointer;">＋ New plan</button>
+  </div>
+  <div class="scrollable" style="padding:1.25rem;">
+    <div id="plans-list"></div>
+    <div id="plans-empty" style="text-align:center;color:var(--text3);font-size:14px;padding:3rem 0;display:none;">
+      No plans yet.<br>Tap <b>＋ New plan</b> to create your first workout plan.
+    </div>
+  </div>
+  <div class="nav-bar">
+    <button class="nav-btn" onclick="goTo('home')"><span class="ni">🏠</span>Home</button>
+    <button class="nav-btn" onclick="goTo('machines-screen')"><span class="ni">⚙️</span>Exercises</button>
+    <button class="nav-btn" onclick="goTo('stats-screen')"><span class="ni">📊</span>Stats</button>
+    <button class="nav-btn" onclick="goTo('history-screen')"><span class="ni">📋</span>History</button>
+    <button class="nav-btn" onclick="goTo('profile-screen')"><span class="ni">👤</span>Profile</button>
+  </div>
+</div>
+
+<!-- CREATE / EDIT PLAN SCREEN -->
+<div id="create-plan-screen" class="screen">
+  <div class="top-bar">
+    <h2 id="create-plan-title">New Plan</h2>
+    <div style="display:flex;gap:8px;">
+      <button onclick="savePlan()" style="background:var(--accent);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:700;font-size:14px;padding:7px 16px;border-radius:99px;cursor:pointer;">Save</button>
+      <button onclick="goTo('plans-screen')" style="background:none;border:1px solid var(--border);color:var(--text2);font-size:13px;padding:7px 14px;border-radius:99px;cursor:pointer;font-family:'Barlow',sans-serif;">Cancel</button>
+    </div>
+  </div>
+  <div class="scrollable" style="padding:1.25rem;display:flex;flex-direction:column;gap:12px;">
+    <div class="profile-field">
+      <label>Plan name</label>
+      <input type="text" id="new-plan-name" placeholder="e.g. Full Body, Push Day, Legs...">
+    </div>
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin-top:4px;">Lists</div>
+    <div id="lists-editor"></div>
+    <button class="add-list-btn" onclick="addListEditor()">＋ Add list</button>
+  </div>
+</div>
+
+
+<!-- SESSION QUEUE SCREEN -->
+<div id="queue-screen" class="screen">
+  <div class="top-bar">
+    <div>
+      <div style="font-size:11px;color:var(--accent2);letter-spacing:1px;text-transform:uppercase;font-weight:600;">Session in progress</div>
+      <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:700;" id="queue-title">Choose exercise</div>
+    </div>
+    <button onclick="finishWorkout()" style="background:none;border:1px solid var(--border);color:var(--text2);font-size:13px;padding:7px 14px;border-radius:99px;cursor:pointer;font-family:'Barlow',sans-serif;">Finish ✓</button>
+  </div>
+  <div class="scrollable" style="padding:1.25rem;">
+    <div class="queue-progress-bar"><div class="queue-progress-fill" id="queue-progress-fill" style="width:0%"></div></div>
+    <div class="queue-stats">
+      <div class="queue-stat"><div class="queue-stat-val" id="queue-done-count">0</div><div class="queue-stat-lbl">Done</div></div>
+      <div class="queue-stat"><div class="queue-stat-val" id="queue-left-count">0</div><div class="queue-stat-lbl">Remaining</div></div>
+      <div class="queue-stat"><div class="queue-stat-val" id="queue-vol-count">0</div><div class="queue-stat-lbl">Vol. kg</div></div>
+    </div>
+    <div id="queue-list"></div>
   </div>
 </div>
 
