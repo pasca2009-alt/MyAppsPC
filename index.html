@@ -2,6 +2,9 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>Gym Coach</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -3538,44 +3541,59 @@ function clearHealthData() {
 function saveManualHealthData() {
   var todayStr = new Date().toISOString().slice(0,10);
 
-  var hr      = parseFloat(document.getElementById('h-hr').value)      || null;
-  var hrv     = parseFloat(document.getElementById('h-hrv').value)     || null;
-  var sleep   = parseFloat(document.getElementById('h-sleep').value)   || null;
-  var steps   = parseInt(document.getElementById('h-steps').value)     || null;
-  var cal     = parseInt(document.getElementById('h-cal').value)       || null;
-  var wMin    = parseInt(document.getElementById('h-workout-min').value)|| null;
-  var wType   = document.getElementById('h-workout-type').value        || null;
+  var hr    = parseFloat(document.getElementById('h-hr').value)       || null;
+  var hrv   = parseFloat(document.getElementById('h-hrv').value)      || null;
+  var sleep = parseFloat(document.getElementById('h-sleep').value)    || null;
+  var steps = parseInt(document.getElementById('h-steps').value)      || null;
+  var cal   = parseInt(document.getElementById('h-cal').value)        || null;
+  var wMin  = parseInt(document.getElementById('h-workout-min').value) || null;
+  var wType = document.getElementById('h-workout-type').value         || null;
 
-  // Merge with any existing entry for today so repeated saves accumulate
-  var existing = healthData && healthData.date === todayStr ? healthData : null;
+  // Always merge into the full existing history (regardless of date)
+  var existing = healthData || {};
 
-  // Build history arrays: prepend today, keep last 30 days
   function mergeDay(arr, newVal) {
     if (newVal === null) return arr || [];
     var filtered = (arr||[]).filter(function(p){ return p.date !== todayStr; });
     return [{ date:todayStr, val:newVal }].concat(filtered).slice(0,30);
   }
 
-  var workouts = (existing && existing.awWorkouts) ? existing.awWorkouts.filter(function(w){ return w.date !== todayStr; }) : [];
+  var hrPoints   = mergeDay(existing.hrPoints,   hr);
+  var hrvPoints  = mergeDay(existing.hrvPoints,  hrv);
+  var stepsDaily = mergeDay(existing.stepsDaily, steps);
+  var calDaily   = mergeDay(existing.calDaily,   cal);
+  var sleepDaily = mergeDay(existing.sleepDaily, sleep);
+
+  var workouts = (existing.awWorkouts||[]).filter(function(w){ return w.date !== todayStr; });
   if (wType && wMin) workouts.unshift({ type:wType, date:todayStr, dur:wMin, cal:cal||0 });
+
+  // KPI shows today's values; falls back to most recent if today was left blank
+  function latest(arr) { return arr.length ? arr[0].val : null; }
 
   var data = {
     importedAt: new Date().toISOString(),
     date: todayStr,
     todayOnly: true,
-    hrPoints:   mergeDay(existing && existing.hrPoints,   hr),
-    hrvPoints:  mergeDay(existing && existing.hrvPoints,  hrv),
-    stepsDaily: mergeDay(existing && existing.stepsDaily, steps),
-    calDaily:   mergeDay(existing && existing.calDaily,   cal),
-    sleepDaily: mergeDay(existing && existing.sleepDaily, sleep),
+    hrPoints:   hrPoints,
+    hrvPoints:  hrvPoints,
+    stepsDaily: stepsDaily,
+    calDaily:   calDaily,
+    sleepDaily: sleepDaily,
     awWorkouts: workouts,
-    hrAll: hr ? [hr] : [],
-    kpi: { avgHR:hr, minHR:hr, maxHR:hr, avgHRV:hrv, avgSteps:steps, avgSleep:sleep, avgCal:cal }
+    hrAll: hr ? [hr] : (existing.hrAll || []),
+    kpi: {
+      avgHR:    latest(hrPoints),
+      minHR:    latest(hrPoints),
+      maxHR:    latest(hrPoints),
+      avgHRV:   latest(hrvPoints),
+      avgSteps: latest(stepsDaily),
+      avgSleep: latest(sleepDaily),
+      avgCal:   latest(calDaily)
+    }
   };
 
   saveHealthData(data);
   renderHealthData(data);
-  // Show the form again as "edit" mode below the panels via the clear button
 }
 
 function groupByDay(points, field, mode) {
