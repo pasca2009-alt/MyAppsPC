@@ -3534,125 +3534,47 @@ function clearHealthData() {
   document.getElementById('health-data-panels').style.display = 'none';
 }
 
-function importHealthXML(event) {
-  var file = event.target.files[0];
-  if (!file) return;
-  var prompt = document.getElementById('health-import-prompt');
-  prompt.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);animation:pulse 1.5s infinite;">⌚ Parsing Health data… this may take a moment.</div>';
+function saveManualHealthData() {
+  var todayStr = new Date().toISOString().slice(0,10);
 
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    try {
-      var xml = e.target.result;
-      var parsed = parseHealthXML(xml);
-      saveHealthData(parsed);
-      renderHealthData(parsed);
-    } catch(err) {
-      document.getElementById('health-import-prompt').innerHTML =
-        '<div style="color:#ff6b6b;padding:16px;text-align:center;">❌ Error parsing file: ' + err.message + '<br><small>Make sure you imported export.xml from Apple Health</small></div>';
-    }
-  };
-  reader.readAsText(file);
-}
+  var hr      = parseFloat(document.getElementById('h-hr').value)      || null;
+  var hrv     = parseFloat(document.getElementById('h-hrv').value)     || null;
+  var sleep   = parseFloat(document.getElementById('h-sleep').value)   || null;
+  var steps   = parseInt(document.getElementById('h-steps').value)     || null;
+  var cal     = parseInt(document.getElementById('h-cal').value)       || null;
+  var wMin    = parseInt(document.getElementById('h-workout-min').value)|| null;
+  var wType   = document.getElementById('h-workout-type').value        || null;
 
-function parseHealthXML(xmlStr) {
-  // Use DOMParser — works in all modern browsers
-  var parser = new DOMParser();
-  var doc = parser.parseFromString(xmlStr, 'text/xml');
+  // Merge with any existing entry for today so repeated saves accumulate
+  var existing = healthData && healthData.date === todayStr ? healthData : null;
 
-  var records = Array.from(doc.querySelectorAll('Record'));
-  var workouts = Array.from(doc.querySelectorAll('Workout'));
+  // Build history arrays: prepend today, keep last 30 days
+  function mergeDay(arr, newVal) {
+    if (newVal === null) return arr || [];
+    var filtered = (arr||[]).filter(function(p){ return p.date !== todayStr; });
+    return [{ date:todayStr, val:newVal }].concat(filtered).slice(0,30);
+  }
 
-  // ── Heart Rate (bpm) ──
-  var hrRaw = records.filter(function(r){ return r.getAttribute('type') === 'HKQuantityTypeIdentifierHeartRate'; });
-  var hrPoints = hrRaw.slice(-180).map(function(r) {
-    return { date: r.getAttribute('startDate').slice(0,10), val: parseFloat(r.getAttribute('value')) };
-  });
+  var workouts = (existing && existing.awWorkouts) ? existing.awWorkouts.filter(function(w){ return w.date !== todayStr; }) : [];
+  if (wType && wMin) workouts.unshift({ type:wType, date:todayStr, dur:wMin, cal:cal||0 });
 
-  // Daily avg HR (last 30 days)
-  var hrByDay = groupByDay(hrPoints, 'val', 'avg');
-
-  // ── HRV (ms) ──
-  var hrvRaw = records.filter(function(r){ return r.getAttribute('type') === 'HKQuantityTypeIdentifierHeartRateVariabilitySDNN'; });
-  var hrvPoints = hrvRaw.slice(-90).map(function(r) {
-    return { date: r.getAttribute('startDate').slice(0,10), val: parseFloat(r.getAttribute('value')) };
-  });
-  var hrvByDay = groupByDay(hrvPoints, 'val', 'avg');
-
-  // ── Steps ──
-  var stepsRaw = records.filter(function(r){ return r.getAttribute('type') === 'HKQuantityTypeIdentifierStepCount'; });
-  var stepsByDay = {};
-  stepsRaw.forEach(function(r) {
-    var d = r.getAttribute('startDate').slice(0,10);
-    stepsByDay[d] = (stepsByDay[d]||0) + parseFloat(r.getAttribute('value'));
-  });
-  var stepsDaily = Object.keys(stepsByDay).sort().slice(-30).map(function(d){ return { date:d, val: Math.round(stepsByDay[d]) }; });
-
-  // ── Active Calories ──
-  var calRaw = records.filter(function(r){ return r.getAttribute('type') === 'HKQuantityTypeIdentifierActiveEnergyBurned'; });
-  var calByDayMap = {};
-  calRaw.forEach(function(r) {
-    var d = r.getAttribute('startDate').slice(0,10);
-    calByDayMap[d] = (calByDayMap[d]||0) + parseFloat(r.getAttribute('value'));
-  });
-  var calDaily = Object.keys(calByDayMap).sort().slice(-30).map(function(d){ return { date:d, val: Math.round(calByDayMap[d]) }; });
-
-  // ── Sleep ──
-  var sleepRaw = records.filter(function(r){
-    var t = r.getAttribute('type');
-    return t === 'HKCategoryTypeIdentifierSleepAnalysis';
-  });
-  var sleepByDay = {};
-  sleepRaw.forEach(function(r) {
-    var val = r.getAttribute('value') || '';
-    // Only count "Asleep" values (not InBed)
-    if (val.indexOf('Asleep') === -1 && val !== 'HKCategoryValueSleepAnalysisAsleep') return;
-    var start = new Date(r.getAttribute('startDate'));
-    var end = new Date(r.getAttribute('endDate'));
-    var dur = (end - start) / 3600000; // hours
-    if (dur <= 0 || dur > 12) return;
-    // Key by the morning date (end date)
-    var d = r.getAttribute('endDate').slice(0,10);
-    sleepByDay[d] = (sleepByDay[d]||0) + dur;
-  });
-  var sleepDaily = Object.keys(sleepByDay).sort().slice(-14).map(function(d){
-    return { date:d, val: Math.round(sleepByDay[d]*10)/10 };
-  });
-
-  // ── Apple Watch Workouts ──
-  var awWorkouts = workouts.slice(-20).map(function(w) {
-    var type = w.getAttribute('workoutActivityType') || '';
-    type = type.replace('HKWorkoutActivityType','').replace(/([A-Z])/g,' $1').trim();
-    var start = new Date(w.getAttribute('startDate'));
-    var end = new Date(w.getAttribute('endDate'));
-    var dur = Math.round((end-start)/60000);
-    var cal = 0;
-    var stats = w.querySelectorAll('WorkoutStatistics');
-    stats.forEach(function(s){
-      if (s.getAttribute('type') === 'HKQuantityTypeIdentifierActiveEnergyBurned') {
-        cal = Math.round(parseFloat(s.getAttribute('sum')||0));
-      }
-    });
-    return { type:type, date:w.getAttribute('startDate').slice(0,10), dur:dur, cal:cal };
-  }).reverse();
-
-  // ── Summary KPIs ──
-  var avgHR = hrPoints.length ? Math.round(hrPoints.reduce(function(a,p){ return a+p.val; },0)/hrPoints.length) : null;
-  var avgHRV = hrvPoints.length ? Math.round(hrvPoints.reduce(function(a,p){ return a+p.val; },0)/hrvPoints.length) : null;
-  var avgSteps = stepsDaily.length ? Math.round(stepsDaily.reduce(function(a,p){ return a+p.val; },0)/stepsDaily.length) : null;
-  var avgSleep = sleepDaily.length ? Math.round(sleepDaily.reduce(function(a,p){ return a+p.val; },0)/sleepDaily.length*10)/10 : null;
-  var avgCal = calDaily.length ? Math.round(calDaily.reduce(function(a,p){ return a+p.val; },0)/calDaily.length) : null;
-
-  return {
+  var data = {
     importedAt: new Date().toISOString(),
-    hrPoints: hrByDay,
-    hrvPoints: hrvByDay,
-    stepsDaily: stepsDaily,
-    calDaily: calDaily,
-    sleepDaily: sleepDaily,
-    awWorkouts: awWorkouts,
-    kpi: { avgHR:avgHR, avgHRV:avgHRV, avgSteps:avgSteps, avgSleep:avgSleep, avgCal:avgCal }
+    date: todayStr,
+    todayOnly: true,
+    hrPoints:   mergeDay(existing && existing.hrPoints,   hr),
+    hrvPoints:  mergeDay(existing && existing.hrvPoints,  hrv),
+    stepsDaily: mergeDay(existing && existing.stepsDaily, steps),
+    calDaily:   mergeDay(existing && existing.calDaily,   cal),
+    sleepDaily: mergeDay(existing && existing.sleepDaily, sleep),
+    awWorkouts: workouts,
+    hrAll: hr ? [hr] : [],
+    kpi: { avgHR:hr, minHR:hr, maxHR:hr, avgHRV:hrv, avgSteps:steps, avgSleep:sleep, avgCal:cal }
   };
+
+  saveHealthData(data);
+  renderHealthData(data);
+  // Show the form again as "edit" mode below the panels via the clear button
 }
 
 function groupByDay(points, field, mode) {
@@ -3675,100 +3597,168 @@ function renderHealthData(data) {
   panels.style.flexDirection = 'column';
   panels.style.gap = '10px';
 
-  // ── KPI Row ──
   var kpi = data.kpi;
+  var isToday = data.todayOnly;
+  var dateLabel = isToday ? ('Today — ' + new Date(data.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})) : '';
+
+  // ── Date label ──
+  if (isToday) {
+    var dl = document.createElement('div');
+    dl.style.cssText = 'font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:700;color:var(--accent2);text-align:center;padding:2px 0 6px;';
+    dl.textContent = '📅 ' + dateLabel;
+    panels.insertBefore(dl, panels.firstChild);
+  }
+
+  // ── KPI Row ──
   var kpiRow = document.getElementById('health-kpi-row');
   kpiRow.innerHTML = [
-    { icon:'❤️', val: kpi.avgHR ? kpi.avgHR + ' bpm' : '—', lbl:'Avg HR' },
-    { icon:'👟', val: kpi.avgSteps ? (kpi.avgSteps>=1000 ? Math.round(kpi.avgSteps/100)/10+'k' : kpi.avgSteps) : '—', lbl:'Daily Steps' },
-    { icon:'😴', val: kpi.avgSleep ? kpi.avgSleep + 'h' : '—', lbl:'Avg Sleep' },
-    { icon:'💚', val: kpi.avgHRV ? kpi.avgHRV + ' ms' : '—', lbl:'Avg HRV' },
-    { icon:'🔥', val: kpi.avgCal ? kpi.avgCal + ' kcal' : '—', lbl:'Active Cal' },
-    { icon:'🏃', val: data.awWorkouts ? data.awWorkouts.length : 0, lbl:'Workouts' }
+    { icon:'❤️', val: kpi.avgHR ? kpi.avgHR + ' bpm' : '—', lbl: isToday ? 'Avg HR today' : 'Avg HR' },
+    { icon:'👟', val: kpi.avgSteps ? (kpi.avgSteps>=1000 ? (Math.round(kpi.avgSteps/100)/10)+'k' : kpi.avgSteps) : '—', lbl: isToday ? 'Steps today' : 'Daily Steps' },
+    { icon:'😴', val: kpi.avgSleep ? kpi.avgSleep + 'h' : '—', lbl: isToday ? 'Sleep last night' : 'Avg Sleep' },
+    { icon:'💚', val: kpi.avgHRV  ? kpi.avgHRV  + ' ms' : '—', lbl:'HRV' },
+    { icon:'🔥', val: kpi.avgCal  ? kpi.avgCal  + ' kcal' : '—', lbl: isToday ? 'Active cal today' : 'Active Cal' },
+    { icon:'🏃', val: data.awWorkouts ? data.awWorkouts.length : 0, lbl: isToday ? 'Workouts today' : 'Workouts' }
   ].map(function(k) {
     return '<div class="health-kpi"><span class="health-kpi-val">' + k.icon + ' ' + k.val + '</span><span class="health-kpi-lbl">' + k.lbl + '</span></div>';
   }).join('');
   kpiRow.style.gridTemplateColumns = 'repeat(3,1fr)';
 
-  // ── Heart Rate Chart ──
-  renderHealthLineChart('hr-chart', data.hrPoints, '#EF4444', 'bpm', healthCharts, 'hr');
+  // ── Heart Rate ──
   var hrEl = document.getElementById('hr-stats');
-  if (data.hrPoints.length) {
-    var vals = data.hrPoints.map(function(p){ return p.val; });
-    var min = Math.min.apply(null,vals), max = Math.max.apply(null,vals);
-    var avg = Math.round(vals.reduce(function(a,v){ return a+v; },0)/vals.length);
+  if (isToday && data.hrAll && data.hrAll.length) {
+    // Show sparkline of all today's readings
+    var hrCanvas = document.getElementById('hr-chart');
+    if (healthCharts['hr']) { try { healthCharts['hr'].destroy(); } catch(e){} }
+    healthCharts['hr'] = new Chart(hrCanvas, {
+      type: 'line',
+      data: {
+        labels: data.hrAll.map(function(_,i){ return i; }),
+        datasets: [{ data: data.hrAll, borderColor:'#EF4444',
+          backgroundColor:'rgba(239,68,68,0.08)', pointRadius:0, fill:true, tension:0.3, borderWidth:2 }]
+      },
+      options: { responsive:true, maintainAspectRatio:false,
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:function(c){ return c.parsed.y+' bpm'; } } } },
+        scales:{ x:{display:false}, y:{ ticks:{color:'#666',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} } }
+      }
+    });
     hrEl.innerHTML = [
-      {lbl:'Min', val: min + ' bpm'},
-      {lbl:'Avg', val: avg + ' bpm'},
-      {lbl:'Max', val: max + ' bpm'}
-    ].map(function(s){ return '<div class="health-kpi"><span class="health-kpi-val">' + s.val + '</span><span class="health-kpi-lbl">' + s.lbl + '</span></div>'; }).join('');
-  }
-
-  // ── HRV Chart ──
-  renderHealthLineChart('hrv-chart', data.hrvPoints, '#4ADE80', 'ms', healthCharts, 'hrv');
-  var hrvEl = document.getElementById('hrv-stats');
-  if (data.hrvPoints.length) {
-    var hrvVals = data.hrvPoints.map(function(p){ return p.val; });
-    var hrvAvg = Math.round(hrvVals.reduce(function(a,v){ return a+v; },0)/hrvVals.length);
-    var hrvTrend = hrvVals.length > 7 ? (hrvVals.slice(-7).reduce(function(a,v){ return a+v; },0)/7 > hrvAvg ? '📈 improving' : '📉 declining') : '';
-    hrvEl.textContent = 'Average: ' + hrvAvg + ' ms  ' + hrvTrend + ' — Higher HRV = better recovery';
-  }
-
-  // ── Sleep Bars ──
-  var sleepEl = document.getElementById('sleep-bars');
-  if (data.sleepDaily.length) {
-    var maxSleep = Math.max.apply(null, data.sleepDaily.map(function(p){ return p.val; }));
-    sleepEl.innerHTML = data.sleepDaily.slice(-10).map(function(p) {
-      var pct = Math.round(p.val/maxSleep*100);
-      var color = p.val >= 7.5 ? '#4ADE80' : p.val >= 6 ? '#F5C97A' : '#EF4444';
-      var label = p.date.slice(5).replace('-','/');
-      return '<div class="sleep-bar-row">' +
-        '<span class="sleep-bar-date">' + label + '</span>' +
-        '<div class="sleep-bar-track"><div class="sleep-bar-fill" style="width:' + pct + '%;background:' + color + ';"></div></div>' +
-        '<span class="sleep-bar-val">' + p.val + 'h</span>' +
-      '</div>';
-    }).join('');
-    var sleepAvg = Math.round(data.sleepDaily.reduce(function(a,p){ return a+p.val; },0)/data.sleepDaily.length*10)/10;
-    document.getElementById('sleep-avg').textContent = 'Average: ' + sleepAvg + 'h/night  ' +
-      (sleepAvg >= 7.5 ? '✅ Great' : sleepAvg >= 6 ? '⚠️ Acceptable' : '❌ Too little');
+      {lbl:'Min',  val: Math.min.apply(null,data.hrAll) + ' bpm'},
+      {lbl:'Avg',  val: kpi.avgHR + ' bpm'},
+      {lbl:'Max',  val: Math.max.apply(null,data.hrAll) + ' bpm'}
+    ].map(function(s){ return '<div class="health-kpi"><span class="health-kpi-val">'+s.val+'</span><span class="health-kpi-lbl">'+s.lbl+'</span></div>'; }).join('');
+  } else if (data.hrPoints.length) {
+    renderHealthLineChart('hr-chart', data.hrPoints, '#EF4444', 'bpm', healthCharts, 'hr');
+    var vals = data.hrPoints.map(function(p){ return p.val; });
+    var min=Math.min.apply(null,vals), max=Math.max.apply(null,vals), avg=Math.round(vals.reduce(function(a,v){return a+v;},0)/vals.length);
+    hrEl.innerHTML = [{lbl:'Min',val:min+' bpm'},{lbl:'Avg',val:avg+' bpm'},{lbl:'Max',val:max+' bpm'}]
+      .map(function(s){ return '<div class="health-kpi"><span class="health-kpi-val">'+s.val+'</span><span class="health-kpi-lbl">'+s.lbl+'</span></div>'; }).join('');
   } else {
-    sleepEl.innerHTML = '<div style="color:var(--text3);font-size:13px;">No sleep data found</div>';
+    hrEl.innerHTML = '<div style="color:var(--text3);font-size:12px;grid-column:1/-1;">No HR data today</div>';
   }
 
-  // ── Steps Chart ──
-  renderHealthBarChart('steps-chart', data.stepsDaily, '#F5C97A', healthCharts, 'steps');
+  // ── HRV ──
+  var hrvEl = document.getElementById('hrv-stats');
+  if (kpi.avgHRV) {
+    if (!isToday) renderHealthLineChart('hrv-chart', data.hrvPoints, '#4ADE80', 'ms', healthCharts, 'hrv');
+    else {
+      // Single value — show as big number instead of chart
+      document.getElementById('hrv-chart').parentElement.innerHTML =
+        '<div style="text-align:center;padding:16px;"><span style="font-family:Barlow Condensed,sans-serif;font-size:48px;font-weight:800;color:#4ADE80;">' + kpi.avgHRV + '</span><span style="color:var(--text3);font-size:14px;"> ms</span></div>';
+    }
+    var hrvQ = kpi.avgHRV > 60 ? '✅ Excellent recovery' : kpi.avgHRV > 40 ? '👍 Good recovery' : '⚠️ Take it easy today';
+    hrvEl.textContent = hrvQ + (isToday ? '' : ' — Higher = better');
+  } else {
+    document.getElementById('hrv-chart').parentElement.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">No HRV data today</div>';
+  }
+
+  // ── Sleep ──
+  var sleepEl = document.getElementById('sleep-bars');
+  var sleepAvgEl = document.getElementById('sleep-avg');
+  if (data.sleepDaily.length) {
+    if (isToday) {
+      var sh = data.sleepDaily[0].val;
+      var sleepColor = sh >= 7.5 ? '#4ADE80' : sh >= 6 ? '#F5C97A' : '#EF4444';
+      var sleepMsg = sh >= 7.5 ? '✅ Well rested' : sh >= 6 ? '⚠️ Acceptable' : '❌ Too little sleep';
+      sleepEl.innerHTML = '<div style="text-align:center;padding:12px;">' +
+        '<span style="font-family:Barlow Condensed,sans-serif;font-size:52px;font-weight:800;color:' + sleepColor + ';">' + sh + '</span>' +
+        '<span style="color:var(--text3);font-size:16px;"> hours</span></div>';
+      sleepAvgEl.textContent = sleepMsg;
+    } else {
+      var maxSleep = Math.max.apply(null, data.sleepDaily.map(function(p){ return p.val; }));
+      sleepEl.innerHTML = data.sleepDaily.slice(-10).map(function(p) {
+        var pct = Math.round(p.val/maxSleep*100);
+        var color = p.val >= 7.5 ? '#4ADE80' : p.val >= 6 ? '#F5C97A' : '#EF4444';
+        return '<div class="sleep-bar-row">' +
+          '<span class="sleep-bar-date">' + p.date.slice(5).replace('-','/') + '</span>' +
+          '<div class="sleep-bar-track"><div class="sleep-bar-fill" style="width:'+pct+'%;background:'+color+';"></div></div>' +
+          '<span class="sleep-bar-val">' + p.val + 'h</span></div>';
+      }).join('');
+      var sAvg = Math.round(data.sleepDaily.reduce(function(a,p){return a+p.val;},0)/data.sleepDaily.length*10)/10;
+      sleepAvgEl.textContent = 'Average: ' + sAvg + 'h/night  ' + (sAvg>=7.5?'✅ Great':sAvg>=6?'⚠️ Acceptable':'❌ Too little');
+    }
+  } else {
+    sleepEl.innerHTML = '<div style="color:var(--text3);font-size:12px;">No sleep data found (check data ends today)</div>';
+  }
+
+  // ── Steps ──
   if (data.stepsDaily.length) {
-    var stepsAvg = Math.round(data.stepsDaily.reduce(function(a,p){ return a+p.val; },0)/data.stepsDaily.length);
-    document.getElementById('steps-avg').textContent = 'Daily average: ' + stepsAvg.toLocaleString() + ' steps  ' +
-      (stepsAvg >= 10000 ? '✅ Excellent' : stepsAvg >= 7000 ? '👍 Good' : '⚠️ Try to move more');
-  }
-
-  // ── Active Calories Chart ──
-  renderHealthBarChart('cal-chart', data.calDaily, '#DA7756', healthCharts, 'cal');
-  if (data.calDaily.length) {
-    var calAvg = Math.round(data.calDaily.reduce(function(a,p){ return a+p.val; },0)/data.calDaily.length);
-    document.getElementById('cal-avg').textContent = 'Daily average: ' + calAvg + ' kcal active';
+    if (isToday) {
+      var st = data.stepsDaily[0].val;
+      var stPct = Math.min(100, Math.round(st/10000*100));
+      var stColor = st>=10000?'#4ADE80':st>=7000?'#F5C97A':'#DA7756';
+      document.getElementById('steps-chart').parentElement.innerHTML =
+        '<div style="padding:8px 0;">' +
+        '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
+          '<span style="font-family:Barlow Condensed,sans-serif;font-size:32px;font-weight:800;color:'+stColor+';">' + st.toLocaleString() + '</span>' +
+          '<span style="color:var(--text3);font-size:12px;align-self:flex-end;">/ 10,000 goal</span>' +
+        '</div>' +
+        '<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;">' +
+          '<div style="width:'+stPct+'%;height:100%;background:'+stColor+';border-radius:99px;"></div>' +
+        '</div></div>';
+      document.getElementById('steps-avg').textContent = stPct + '% of daily goal' + (st>=10000?' ✅':'');
+    } else {
+      renderHealthBarChart('steps-chart', data.stepsDaily, '#F5C97A', healthCharts, 'steps');
+      var stAvg = Math.round(data.stepsDaily.reduce(function(a,p){return a+p.val;},0)/data.stepsDaily.length);
+      document.getElementById('steps-avg').textContent = 'Daily avg: ' + stAvg.toLocaleString() + ' steps  ' + (stAvg>=10000?'✅ Excellent':stAvg>=7000?'👍 Good':'⚠️ Move more');
+    }
+  } else {
+    document.getElementById('steps-chart').parentElement.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">No step data today</div>';
   }
 
   // ── Apple Watch Workouts ──
   var awEl = document.getElementById('aw-workouts-list');
   if (data.awWorkouts && data.awWorkouts.length) {
-    awEl.innerHTML = data.awWorkouts.slice(0,8).map(function(w) {
-      var durStr = w.dur >= 60 ? Math.floor(w.dur/60) + 'h ' + (w.dur%60) + 'm' : w.dur + ' min';
+    awEl.innerHTML = data.awWorkouts.map(function(w) {
+      var durStr = w.dur >= 60 ? Math.floor(w.dur/60)+'h '+(w.dur%60)+'m' : w.dur+' min';
       return '<div class="aw-workout-row">' +
         '<div><div class="aw-workout-type">' + esc(w.type) + '</div><div class="aw-workout-meta">' + w.date + ' · ' + durStr + '</div></div>' +
-        '<div class="aw-workout-cal">' + (w.cal ? w.cal + ' kcal' : '—') + '</div>' +
-      '</div>';
+        '<div class="aw-workout-cal">' + (w.cal ? w.cal+' kcal' : '—') + '</div></div>';
     }).join('');
   } else {
-    awEl.innerHTML = '<div style="color:var(--text3);font-size:13px;">No workouts found</div>';
+    awEl.innerHTML = '<div style="color:var(--text3);font-size:13px;">No ' + (isToday?'workouts today':'workouts found') + '</div>';
   }
 
-  // Import date note
+  // ── Active Calories ──
+  if (data.calDaily.length) {
+    if (isToday) {
+      var ca = data.calDaily[0].val;
+      document.getElementById('cal-chart').parentElement.innerHTML =
+        '<div style="text-align:center;padding:16px;"><span style="font-family:Barlow Condensed,sans-serif;font-size:48px;font-weight:800;color:#DA7756;">' + ca + '</span><span style="color:var(--text3);font-size:14px;"> kcal</span></div>';
+      document.getElementById('cal-avg').textContent = 'Active calories burned today';
+    } else {
+      renderHealthBarChart('cal-chart', data.calDaily, '#DA7756', healthCharts, 'cal');
+      var caAvg = Math.round(data.calDaily.reduce(function(a,p){return a+p.val;},0)/data.calDaily.length);
+      document.getElementById('cal-avg').textContent = 'Daily average: ' + caAvg + ' kcal active';
+    }
+  } else {
+    document.getElementById('cal-chart').parentElement.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">No calorie data today</div>';
+  }
+
+  // ── Import note ──
   var importNote = document.createElement('div');
   importNote.style.cssText = 'font-size:10px;color:var(--text3);text-align:center;';
-  importNote.textContent = 'Imported: ' + new Date(data.importedAt).toLocaleDateString('en-GB');
-  document.getElementById('health-data-panels').appendChild(importNote);
+  importNote.textContent = (isToday ? '⌚ Today\'s data — ' : 'Imported: ') + new Date(data.importedAt).toLocaleString('en-GB');
+  panels.appendChild(importNote);
 }
 
 function renderHealthLineChart(canvasId, points, color, unit, chartsObj, key) {
@@ -4000,18 +3990,56 @@ function renderHealthSection() {
     <div class="stats-section">
       <div class="stats-section-title">⌚ Apple Watch & Health</div>
       <div id="health-section">
-        <!-- Import prompt (shown when no data) -->
-        <div id="health-import-prompt" style="background:var(--surface);border:1.5px dashed rgba(245,201,122,0.3);border-radius:14px;padding:20px;text-align:center;">
-          <div style="font-size:36px;margin-bottom:8px;">⌚</div>
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:18px;font-weight:800;color:var(--text);margin-bottom:6px;">Import Apple Health Data</div>
-          <div style="font-size:12px;color:var(--text3);line-height:1.6;margin-bottom:14px;">
-            On iPhone: <b style="color:var(--text2);">Health app → Profile pic → Export All Health Data</b><br>
-            Unzip the file, then import <b style="color:var(--text2);">export.xml</b> here.
+        <!-- Manual input form (shown when no data) -->
+        <div id="health-import-prompt" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;">⌚ Today's Health Data <span style="font-size:11px;font-weight:400;color:var(--text3);font-family:'Barlow',sans-serif;">from Apple Watch</span></div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+            <div class="profile-field">
+              <label>❤️ Avg HR (bpm)</label>
+              <input type="number" id="h-hr" placeholder="e.g. 68" min="30" max="220">
+            </div>
+            <div class="profile-field">
+              <label>💚 HRV (ms)</label>
+              <input type="number" id="h-hrv" placeholder="e.g. 45" min="1" max="200">
+            </div>
+            <div class="profile-field">
+              <label>😴 Sleep (hours)</label>
+              <input type="number" id="h-sleep" placeholder="e.g. 7.5" min="0" max="14" step="0.1">
+            </div>
+            <div class="profile-field">
+              <label>👟 Steps</label>
+              <input type="number" id="h-steps" placeholder="e.g. 8400" min="0" max="100000">
+            </div>
+            <div class="profile-field">
+              <label>🔥 Active cal (kcal)</label>
+              <input type="number" id="h-cal" placeholder="e.g. 520" min="0" max="5000">
+            </div>
+            <div class="profile-field">
+              <label>🏃 Workout (min)</label>
+              <input type="number" id="h-workout-min" placeholder="e.g. 55" min="0" max="600">
+            </div>
           </div>
-          <label style="display:inline-block;background:linear-gradient(135deg,#F5C97A,#DA7756);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:14px;letter-spacing:1px;text-transform:uppercase;padding:11px 22px;border-radius:99px;cursor:pointer;">
-            📂 Import export.xml
-            <input type="file" accept=".xml" id="health-xml-input" style="display:none;" onchange="importHealthXML(event)">
-          </label>
+
+          <div class="profile-field" style="margin-top:6px;">
+            <label>🏋️ Workout type</label>
+            <select id="h-workout-type">
+              <option value="">— none today —</option>
+              <option>Traditional Strength Training</option>
+              <option>Functional Strength Training</option>
+              <option>Running</option>
+              <option>Cycling</option>
+              <option>HIIT</option>
+              <option>Yoga</option>
+              <option>Swimming</option>
+              <option>Walking</option>
+              <option>Other</option>
+            </select>
+          </div>
+
+          <button onclick="saveManualHealthData()" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#F5C97A,#DA7756);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:13px;border-radius:99px;cursor:pointer;">
+            ⌚ Save today's data
+          </button>
         </div>
 
         <!-- Data panels (hidden until imported) -->
