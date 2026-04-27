@@ -376,8 +376,9 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
 .profile-field label { font-size:11px; color:var(--text3); text-transform:uppercase; letter-spacing:1px; font-weight:600; }
 .profile-field input, .profile-field select, .profile-field textarea {
   background:var(--surface2); border:1px solid var(--border); border-radius:10px;
-  padding:10px 12px; color:var(--text); font-size:14px; font-family:'Barlow',sans-serif;
-  outline:none; width:100%; }
+  padding:10px 12px; color:var(--text); font-size:16px; font-family:'Barlow',sans-serif;
+  outline:none; width:100%; box-sizing:border-box;
+  -webkit-appearance:none; appearance:none; }
 .profile-field input:focus, .profile-field select:focus, .profile-field textarea:focus {
   border-color:var(--accent); }
 .profile-field select option { background:#1a1a1a; }
@@ -3997,27 +3998,27 @@ function renderHealthSection() {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="profile-field">
               <label>❤️ Avg HR (bpm)</label>
-              <input type="number" id="h-hr" placeholder="e.g. 68" min="30" max="220">
+              <input type="number" id="h-hr" placeholder="es. 68" min="30" max="220" inputmode="numeric">
             </div>
             <div class="profile-field">
               <label>💚 HRV (ms)</label>
-              <input type="number" id="h-hrv" placeholder="e.g. 45" min="1" max="200">
+              <input type="number" id="h-hrv" placeholder="es. 45" min="1" max="200" inputmode="numeric">
             </div>
             <div class="profile-field">
-              <label>😴 Sleep (hours)</label>
-              <input type="number" id="h-sleep" placeholder="e.g. 7.5" min="0" max="14" step="0.1">
+              <label>😴 Sonno (ore)</label>
+              <input type="number" id="h-sleep" placeholder="es. 7.5" min="0" max="14" step="0.5" inputmode="decimal">
             </div>
             <div class="profile-field">
-              <label>👟 Steps</label>
-              <input type="number" id="h-steps" placeholder="e.g. 8400" min="0" max="100000">
+              <label>👟 Passi</label>
+              <input type="number" id="h-steps" placeholder="es. 8400" min="0" max="100000" inputmode="numeric">
             </div>
             <div class="profile-field">
-              <label>🔥 Active cal (kcal)</label>
-              <input type="number" id="h-cal" placeholder="e.g. 520" min="0" max="5000">
+              <label>🔥 Cal. attive</label>
+              <input type="number" id="h-cal" placeholder="es. 520" min="0" max="5000" inputmode="numeric">
             </div>
             <div class="profile-field">
               <label>🏃 Workout (min)</label>
-              <input type="number" id="h-workout-min" placeholder="e.g. 55" min="0" max="600">
+              <input type="number" id="h-workout-min" placeholder="es. 55" min="0" max="600" inputmode="numeric">
             </div>
           </div>
 
