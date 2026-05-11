@@ -25,8 +25,17 @@
   --green: #4ADE80; --red: #FF5A5A; --radius: 14px;
 }
 html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; overflow-x: hidden; }
-.screen { display: none; flex-direction: column; min-height: 100vh; }
+.screen { display: none; flex-direction: column; min-height: 100vh; padding-bottom: calc(64px + env(safe-area-inset-bottom, 16px)); }
 .screen.active { display: flex; }
+/* Swipe transition between main screens */
+.screen.swipe-out-left  { animation: swipeOutLeft  0.22s ease-in forwards; }
+.screen.swipe-out-right { animation: swipeOutRight 0.22s ease-in forwards; }
+.screen.swipe-in-left   { animation: swipeInLeft   0.22s ease-out forwards; }
+.screen.swipe-in-right  { animation: swipeInRight  0.22s ease-out forwards; }
+@keyframes swipeOutLeft  { from { transform: translateX(0);     opacity:1; } to { transform: translateX(-30%); opacity:0; } }
+@keyframes swipeOutRight { from { transform: translateX(0);     opacity:1; } to { transform: translateX(30%);  opacity:0; } }
+@keyframes swipeInLeft   { from { transform: translateX(30%);   opacity:0; } to { transform: translateX(0);    opacity:1; } }
+@keyframes swipeInRight  { from { transform: translateX(-30%);  opacity:0; } to { transform: translateX(0);    opacity:1; } }
 .top-bar { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--border); background: rgba(13,13,13,0.95); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); position: sticky; top: 0; z-index: 10; flex-shrink: 0; }
 .top-bar h2 { font-family: 'Barlow Condensed', sans-serif; font-size: 22px; font-weight: 700; }
 .scrollable { flex: 1; overflow-y: auto; }
@@ -39,7 +48,7 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
 .btn-ghost { background: transparent; color: var(--text2); border: 1px solid var(--border); font-family: 'Barlow', sans-serif; font-size: 13px; padding: 9px 24px; border-radius: 99px; cursor: pointer; width: 100%; }
 .btn-ghost:hover { border-color: var(--text2); color: var(--text); }
 .section-label { font-size: 13px; color: #F5C97A; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 10px; }
-.nav-bar { display: flex; border-top: 1px solid var(--border); flex-shrink: 0; background: rgba(13,13,13,0.97); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding-bottom: env(safe-area-inset-bottom, 16px); }
+.nav-bar { display: flex; border-top: 1px solid var(--border); flex-shrink: 0; background: rgba(13,13,13,0.97); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); padding-bottom: env(safe-area-inset-bottom, 16px); position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; }
 .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 14px 0 10px; cursor: pointer; border: none; background: none; color: var(--text3); font-size: 10px; font-weight: 600; letter-spacing: 0.5px; text-transform: uppercase; transition: color 0.15s; }
 .nav-btn.active { color: var(--accent); }
 .nav-btn .ni { font-size: 17px; }
@@ -886,6 +895,7 @@ async function saveHistory()  { try { localStorage.setItem('gymcoach_sessions', 
 function goTo(id) {
   document.querySelectorAll('.screen').forEach(function(s){
     s.classList.remove('active');
+    s.classList.remove('swipe-out-left','swipe-out-right','swipe-in-left','swipe-in-right');
     s.style.display = ''; // reset any inline display override
   });
   document.getElementById(id).classList.add('active');
@@ -896,6 +906,88 @@ function goTo(id) {
   if (id === 'home') updateHomeStats();
   if (id === 'plans-screen') renderPlansScreen();
 }
+
+// ── HORIZONTAL SWIPE BETWEEN MAIN SCREENS ──
+(function(){
+  var MAIN_SCREENS = ['home','machines-screen','stats-screen','history-screen','profile-screen'];
+  var THRESHOLD = 60;      // min horizontal px to trigger
+  var MAX_VERTICAL = 50;   // ignore if vertical drift exceeds this
+  var startX = 0, startY = 0, tracking = false, blocked = false;
+
+  function currentMainIndex() {
+    var active = document.querySelector('.screen.active');
+    if (!active) return -1;
+    return MAIN_SCREENS.indexOf(active.id);
+  }
+
+  function isScrollableX(el) {
+    while (el && el !== document.body) {
+      var s = window.getComputedStyle(el);
+      var ox = s.overflowX;
+      if ((ox === 'auto' || ox === 'scroll') && el.scrollWidth > el.clientWidth) return true;
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  function isInteractive(el) {
+    while (el && el !== document.body) {
+      var tag = el.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || tag === 'BUTTON') return true;
+      if (el.classList && (el.classList.contains('nav-bar') || el.classList.contains('nav-btn'))) return true;
+      // ignore swipe over charts/canvas (Chart.js)
+      if (tag === 'CANVAS') return true;
+      el = el.parentElement;
+    }
+    return false;
+  }
+
+  function animateTransition(fromEl, toId, direction) {
+    // direction: 'left' means we move forward (next screen comes from right)
+    var toEl = document.getElementById(toId);
+    if (!toEl) return;
+    var outClass = direction === 'left' ? 'swipe-out-left' : 'swipe-out-right';
+    var inClass  = direction === 'left' ? 'swipe-in-left'  : 'swipe-in-right';
+
+    fromEl.classList.add(outClass);
+    setTimeout(function(){
+      goTo(toId);
+      var newActive = document.getElementById(toId);
+      if (newActive) {
+        newActive.classList.add(inClass);
+        setTimeout(function(){ newActive.classList.remove(inClass); }, 240);
+      }
+    }, 200);
+  }
+
+  document.addEventListener('touchstart', function(e){
+    if (e.touches.length !== 1) { tracking = false; return; }
+    var t = e.touches[0];
+    startX = t.clientX; startY = t.clientY;
+    blocked = isInteractive(e.target) || isScrollableX(e.target);
+    tracking = !blocked;
+  }, { passive: true });
+
+  document.addEventListener('touchend', function(e){
+    if (!tracking) return;
+    tracking = false;
+    var t = e.changedTouches[0];
+    var dx = t.clientX - startX;
+    var dy = t.clientY - startY;
+    if (Math.abs(dy) > MAX_VERTICAL) return;
+    if (Math.abs(dx) < THRESHOLD) return;
+
+    var idx = currentMainIndex();
+    if (idx === -1) return; // not on a main screen
+
+    var fromEl = document.querySelector('.screen.active');
+    if (dx < 0 && idx < MAIN_SCREENS.length - 1) {
+      animateTransition(fromEl, MAIN_SCREENS[idx + 1], 'left');
+    } else if (dx > 0 && idx > 0) {
+      animateTransition(fromEl, MAIN_SCREENS[idx - 1], 'right');
+    }
+  }, { passive: true });
+})();
 
 // ── ICONS ──
 function getMachineIcon(name) {
