@@ -2526,6 +2526,22 @@ function generatePlan() {
     });
   });
 
+  // ── Days since last training for each muscle group (uses full history) ──
+  var NOW = Date.now();
+  var DAY_MS = 24 * 60 * 60 * 1000;
+  var daysSince = {};
+  allGroups.forEach(function(g){ daysSince[g] = Infinity; });
+  sessionHistory.forEach(function(s) {
+    if (!s.id) return; // needs a timestamp
+    var days = (NOW - s.id) / DAY_MS;
+    (s.exercises || []).forEach(function(e){
+      var g = getMuscleGroup(e.name);
+      if (g && days < daysSince[g]) daysSince[g] = days;
+    });
+  });
+  // Groups untrained for more than 7 days (or never) → must be included
+  var neglectedGroups = allGroups.filter(function(g){ return daysSince[g] > 7; });
+
   // Filter by active muscle filter
   var pool = machines.filter(function(m){ return isMachineAllowed(m.name); });
 
@@ -2606,18 +2622,39 @@ function generatePlan() {
   });
   scored.sort(function(a,b){ return a.score - b.score; });
 
-  // Pick 10 ensuring muscle variety — max 2 per group
   var selected = [];
   var groupCount = {};
+
+  // ── STEP 1: guarantee one exercise for each neglected group (>7 days) ──
+  // Sort neglected groups by how long they've been ignored (most neglected first)
+  var neglectedSorted = neglectedGroups.slice().sort(function(a,b){
+    var da = daysSince[a] === Infinity ? 1e9 : daysSince[a];
+    var db = daysSince[b] === Infinity ? 1e9 : daysSince[b];
+    return db - da;
+  });
+  neglectedSorted.forEach(function(g) {
+    if (selected.length >= 10) return;
+    // pick the best-scored exercise from this group that's in the pool
+    for (var i = 0; i < scored.length; i++) {
+      if (scored[i].g === g && selected.indexOf(scored[i].m) === -1) {
+        selected.push(scored[i].m);
+        groupCount[g] = (groupCount[g] || 0) + 1;
+        break;
+      }
+    }
+  });
+
+  // ── STEP 2: fill the rest with normal rotation — max 2 per group ──
   for (var i = 0; i < scored.length && selected.length < 10; i++) {
     var item = scored[i];
+    if (selected.indexOf(item.m) !== -1) continue;
     var gc = groupCount[item.g] || 0;
     if (gc < 2) {
       selected.push(item.m);
       groupCount[item.g] = gc + 1;
     }
   }
-  // If still under 10, fill remaining
+  // If still under 10, relax the max-2 rule
   for (var j = 0; j < scored.length && selected.length < 10; j++) {
     if (selected.indexOf(scored[j].m) === -1) selected.push(scored[j].m);
   }
@@ -3667,355 +3704,219 @@ function renderBadgesInStats() {
   }).join('');
 }
 
-// ── APPLE HEALTH XML IMPORT ──
-var healthData = null; // parsed health data stored in memory + localStorage
-var healthCharts = {}; // chart instances
 
-function loadHealthData() {
+// ── ACTIVITY LOG (duration + calories per day) ──
+var healthEntries = []; // [{date:'YYYY-MM-DD', duration:Number, calories:Number}, ...]
+var healthCharts = {};
+
+function loadHealthEntries() {
   try {
     var raw = localStorage.getItem('gymcoach_health');
-    if (raw) { healthData = JSON.parse(raw); return true; }
-  } catch(e) {}
-  return false;
+    if (!raw) { healthEntries = []; return; }
+    var parsed = JSON.parse(raw);
+    // Accept new format (array) OR legacy (object) — legacy is silently discarded
+    healthEntries = Array.isArray(parsed) ? parsed : [];
+  } catch(e) { healthEntries = []; }
 }
 
-function saveHealthData(data) {
-  healthData = data;
-  try {
-    // Store only aggregated data (not raw XML) to stay within localStorage limits
-    localStorage.setItem('gymcoach_health', JSON.stringify(data));
-  } catch(e) {
-    // If too large, store without raw points
-    try {
-      var slim = JSON.parse(JSON.stringify(data));
-      slim.hrPoints = slim.hrPoints ? slim.hrPoints.slice(-90) : [];
-      slim.hrvPoints = slim.hrvPoints ? slim.hrvPoints.slice(-90) : [];
-      slim.stepsDaily = slim.stepsDaily ? slim.stepsDaily.slice(-60) : [];
-      slim.calDaily = slim.calDaily ? slim.calDaily.slice(-60) : [];
-      slim.sleepDaily = slim.sleepDaily ? slim.sleepDaily.slice(-30) : [];
-      localStorage.setItem('gymcoach_health', JSON.stringify(slim));
-    } catch(e2) {}
+function persistHealthEntries() {
+  try { localStorage.setItem('gymcoach_health', JSON.stringify(healthEntries)); } catch(e) {}
+}
+
+function _todayISO() {
+  var d = new Date();
+  var mm = String(d.getMonth()+1).padStart(2,'0');
+  var dd = String(d.getDate()).padStart(2,'0');
+  return d.getFullYear() + '-' + mm + '-' + dd;
+}
+
+function _hStatus(msg, isError) {
+  var el = document.getElementById('h-save-status');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.style.color = isError ? '#E27D60' : '#4ADE80';
+  if (msg) setTimeout(function(){ if (el.textContent === msg) el.textContent = ''; }, 3000);
+}
+
+function saveHealthEntry() {
+  var dateEl = document.getElementById('h-date');
+  var durEl  = document.getElementById('h-duration');
+  var calEl  = document.getElementById('h-calories');
+  var date = (dateEl.value || '').trim();
+  var dur  = parseFloat(durEl.value);
+  var cal  = parseFloat(calEl.value);
+
+  if (!date) { _hStatus('Seleziona una data', true); return; }
+  if ((isNaN(dur) || dur < 0) && (isNaN(cal) || cal < 0)) {
+    _hStatus('Inserisci almeno un valore', true); return;
   }
-}
+  if (!isNaN(dur) && dur > 600) { _hStatus('Durata troppo alta', true); return; }
+  if (!isNaN(cal) && cal > 5000) { _hStatus('Calorie troppo alte', true); return; }
 
-function clearHealthData() {
-  if (!confirm('Remove imported Apple Health data?')) return;
-  healthData = null;
-  try { localStorage.removeItem('gymcoach_health'); } catch(e) {}
-  Object.keys(healthCharts).forEach(function(k){ try { healthCharts[k].destroy(); } catch(e){} });
-  healthCharts = {};
-  document.getElementById('health-import-prompt').style.display = 'block';
-  document.getElementById('health-data-panels').style.display = 'none';
-}
-
-function saveManualHealthData() {
-  var todayStr = new Date().toISOString().slice(0,10);
-
-  var hr    = parseFloat(document.getElementById('h-hr').value)       || null;
-  var hrv   = parseFloat(document.getElementById('h-hrv').value)      || null;
-  var sleep = parseFloat(document.getElementById('h-sleep').value)    || null;
-  var steps = parseInt(document.getElementById('h-steps').value)      || null;
-  var cal   = parseInt(document.getElementById('h-cal').value)        || null;
-  var wMin  = parseInt(document.getElementById('h-workout-min').value) || null;
-  var wType = document.getElementById('h-workout-type').value         || null;
-
-  // Always merge into the full existing history (regardless of date)
-  var existing = healthData || {};
-
-  function mergeDay(arr, newVal) {
-    if (newVal === null) return arr || [];
-    var filtered = (arr||[]).filter(function(p){ return p.date !== todayStr; });
-    return [{ date:todayStr, val:newVal }].concat(filtered).slice(0,30);
-  }
-
-  var hrPoints   = mergeDay(existing.hrPoints,   hr);
-  var hrvPoints  = mergeDay(existing.hrvPoints,  hrv);
-  var stepsDaily = mergeDay(existing.stepsDaily, steps);
-  var calDaily   = mergeDay(existing.calDaily,   cal);
-  var sleepDaily = mergeDay(existing.sleepDaily, sleep);
-
-  var workouts = (existing.awWorkouts||[]).filter(function(w){ return w.date !== todayStr; });
-  if (wType && wMin) workouts.unshift({ type:wType, date:todayStr, dur:wMin, cal:cal||0 });
-
-  // KPI shows today's values; falls back to most recent if today was left blank
-  function latest(arr) { return arr.length ? arr[0].val : null; }
-
-  var data = {
-    importedAt: new Date().toISOString(),
-    date: todayStr,
-    todayOnly: true,
-    hrPoints:   hrPoints,
-    hrvPoints:  hrvPoints,
-    stepsDaily: stepsDaily,
-    calDaily:   calDaily,
-    sleepDaily: sleepDaily,
-    awWorkouts: workouts,
-    hrAll: hr ? [hr] : (existing.hrAll || []),
-    kpi: {
-      avgHR:    latest(hrPoints),
-      minHR:    latest(hrPoints),
-      maxHR:    latest(hrPoints),
-      avgHRV:   latest(hrvPoints),
-      avgSteps: latest(stepsDaily),
-      avgSleep: latest(sleepDaily),
-      avgCal:   latest(calDaily)
-    }
+  var entry = {
+    date: date,
+    duration: isNaN(dur) ? 0 : Math.round(dur),
+    calories: isNaN(cal) ? 0 : Math.round(cal)
   };
 
-  saveHealthData(data);
-  renderHealthData(data);
+  // Upsert: overwrite same-date entry
+  var idx = healthEntries.findIndex(function(e){ return e.date === date; });
+  if (idx >= 0) healthEntries[idx] = entry;
+  else healthEntries.push(entry);
+
+  healthEntries.sort(function(a,b){ return a.date < b.date ? -1 : (a.date > b.date ? 1 : 0); });
+  persistHealthEntries();
+
+  durEl.value = '';
+  calEl.value = '';
+  _hStatus('✓ Salvato');
+  renderHealthSection();
 }
 
-function groupByDay(points, field, mode) {
-  var byDay = {};
-  points.forEach(function(p) {
-    if (!byDay[p.date]) byDay[p.date] = [];
-    byDay[p.date].push(p.val);
+function deleteHealthEntry(date) {
+  if (!confirm('Cancellare l\'entry del ' + date + '?')) return;
+  healthEntries = healthEntries.filter(function(e){ return e.date !== date; });
+  persistHealthEntries();
+  renderHealthSection();
+}
+
+function _last30Days() {
+  var days = [];
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  for (var i = 29; i >= 0; i--) {
+    var d = new Date(today);
+    d.setDate(today.getDate() - i);
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    var dd = String(d.getDate()).padStart(2,'0');
+    days.push(d.getFullYear() + '-' + mm + '-' + dd);
+  }
+  return days;
+}
+
+function _formatDay(iso) {
+  // 'YYYY-MM-DD' -> 'DD/MM'
+  var p = iso.split('-');
+  return p[2] + '/' + p[1];
+}
+
+function renderHealthKPIs() {
+  var row = document.getElementById('health-kpi-row');
+  if (!row) return;
+
+  var today = new Date();
+  today.setHours(0,0,0,0);
+  var last7Start = new Date(today);
+  last7Start.setDate(today.getDate() - 6); // includes today = 7 days
+
+  var last7 = healthEntries.filter(function(e){
+    var d = new Date(e.date + 'T00:00:00');
+    return d >= last7Start && d <= today;
   });
-  return Object.keys(byDay).sort().map(function(d) {
-    var vals = byDay[d];
-    var result = mode === 'avg' ? vals.reduce(function(a,v){ return a+v; },0)/vals.length : vals.reduce(function(a,v){ return a+v; },0);
-    return { date:d, val: Math.round(result*10)/10 };
-  });
+
+  var count7 = last7.length;
+  var totDur = last7.reduce(function(s,e){ return s + (e.duration||0); }, 0);
+  var totCal = last7.reduce(function(s,e){ return s + (e.calories||0); }, 0);
+  var avgDur = count7 ? Math.round(totDur / count7) : 0;
+  var avgCal = count7 ? Math.round(totCal / count7) : 0;
+
+  function kpi(label, value, unit) {
+    return '<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center;">' +
+      '<div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;">' + label + '</div>' +
+      '<div style="font-family:\'Barlow Condensed\',sans-serif;font-size:22px;font-weight:800;color:var(--text);line-height:1.1;margin-top:2px;">' + value + '<span style="font-size:11px;color:var(--text3);font-weight:500;margin-left:3px;">' + unit + '</span></div>' +
+    '</div>';
+  }
+
+  row.innerHTML =
+    kpi('Avg 7d — duration', avgDur, 'min') +
+    kpi('Avg 7d — calories', avgCal, 'kcal') +
+    kpi('Week total — duration', totDur, 'min') +
+    kpi('Week total — calories', totCal, 'kcal');
 }
 
-function renderHealthData(data) {
-  document.getElementById('health-import-prompt').style.display = 'none';
-  var panels = document.getElementById('health-data-panels');
-  panels.style.display = 'flex';
-  panels.style.flexDirection = 'column';
-  panels.style.gap = '10px';
-
-  var kpi = data.kpi;
-  var isToday = data.todayOnly;
-  var dateLabel = isToday ? ('Today — ' + new Date(data.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})) : '';
-
-  // ── Date label ──
-  if (isToday) {
-    var dl = document.createElement('div');
-    dl.style.cssText = 'font-family:Barlow Condensed,sans-serif;font-size:15px;font-weight:700;color:var(--accent2);text-align:center;padding:2px 0 6px;';
-    dl.textContent = '📅 ' + dateLabel;
-    panels.insertBefore(dl, panels.firstChild);
-  }
-
-  // ── KPI Row ──
-  var kpiRow = document.getElementById('health-kpi-row');
-  kpiRow.innerHTML = [
-    { icon:'❤️', val: kpi.avgHR ? kpi.avgHR + ' bpm' : '—', lbl: isToday ? 'Avg HR today' : 'Avg HR' },
-    { icon:'👟', val: kpi.avgSteps ? (kpi.avgSteps>=1000 ? (Math.round(kpi.avgSteps/100)/10)+'k' : kpi.avgSteps) : '—', lbl: isToday ? 'Steps today' : 'Daily Steps' },
-    { icon:'😴', val: kpi.avgSleep ? kpi.avgSleep + 'h' : '—', lbl: isToday ? 'Sleep last night' : 'Avg Sleep' },
-    { icon:'💚', val: kpi.avgHRV  ? kpi.avgHRV  + ' ms' : '—', lbl:'HRV' },
-    { icon:'🔥', val: kpi.avgCal  ? kpi.avgCal  + ' kcal' : '—', lbl: isToday ? 'Active cal today' : 'Active Cal' },
-    { icon:'🏃', val: data.awWorkouts ? data.awWorkouts.length : 0, lbl: isToday ? 'Workouts today' : 'Workouts' }
-  ].map(function(k) {
-    return '<div class="health-kpi"><span class="health-kpi-val">' + k.icon + ' ' + k.val + '</span><span class="health-kpi-lbl">' + k.lbl + '</span></div>';
-  }).join('');
-  kpiRow.style.gridTemplateColumns = 'repeat(3,1fr)';
-
-  // ── Heart Rate ──
-  var hrEl = document.getElementById('hr-stats');
-  if (isToday && data.hrAll && data.hrAll.length) {
-    // Show sparkline of all today's readings
-    var hrCanvas = document.getElementById('hr-chart');
-    if (healthCharts['hr']) { try { healthCharts['hr'].destroy(); } catch(e){} }
-    healthCharts['hr'] = new Chart(hrCanvas, {
-      type: 'line',
-      data: {
-        labels: data.hrAll.map(function(_,i){ return i; }),
-        datasets: [{ data: data.hrAll, borderColor:'#EF4444',
-          backgroundColor:'rgba(239,68,68,0.08)', pointRadius:0, fill:true, tension:0.3, borderWidth:2 }]
-      },
-      options: { responsive:true, maintainAspectRatio:false,
-        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:function(c){ return c.parsed.y+' bpm'; } } } },
-        scales:{ x:{display:false}, y:{ ticks:{color:'#666',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} } }
-      }
-    });
-    hrEl.innerHTML = [
-      {lbl:'Min',  val: Math.min.apply(null,data.hrAll) + ' bpm'},
-      {lbl:'Avg',  val: kpi.avgHR + ' bpm'},
-      {lbl:'Max',  val: Math.max.apply(null,data.hrAll) + ' bpm'}
-    ].map(function(s){ return '<div class="health-kpi"><span class="health-kpi-val">'+s.val+'</span><span class="health-kpi-lbl">'+s.lbl+'</span></div>'; }).join('');
-  } else if (data.hrPoints.length) {
-    renderHealthLineChart('hr-chart', data.hrPoints, '#EF4444', 'bpm', healthCharts, 'hr');
-    var vals = data.hrPoints.map(function(p){ return p.val; });
-    var min=Math.min.apply(null,vals), max=Math.max.apply(null,vals), avg=Math.round(vals.reduce(function(a,v){return a+v;},0)/vals.length);
-    hrEl.innerHTML = [{lbl:'Min',val:min+' bpm'},{lbl:'Avg',val:avg+' bpm'},{lbl:'Max',val:max+' bpm'}]
-      .map(function(s){ return '<div class="health-kpi"><span class="health-kpi-val">'+s.val+'</span><span class="health-kpi-lbl">'+s.lbl+'</span></div>'; }).join('');
-  } else {
-    hrEl.innerHTML = '<div style="color:var(--text3);font-size:12px;grid-column:1/-1;">No HR data today</div>';
-  }
-
-  // ── HRV ──
-  var hrvEl = document.getElementById('hrv-stats');
-  if (kpi.avgHRV) {
-    if (!isToday) renderHealthLineChart('hrv-chart', data.hrvPoints, '#4ADE80', 'ms', healthCharts, 'hrv');
-    else {
-      // Single value — show as big number instead of chart
-      document.getElementById('hrv-chart').parentElement.innerHTML =
-        '<div style="text-align:center;padding:16px;"><span style="font-family:Barlow Condensed,sans-serif;font-size:48px;font-weight:800;color:#4ADE80;">' + kpi.avgHRV + '</span><span style="color:var(--text3);font-size:14px;"> ms</span></div>';
-    }
-    var hrvQ = kpi.avgHRV > 60 ? '✅ Excellent recovery' : kpi.avgHRV > 40 ? '👍 Good recovery' : '⚠️ Take it easy today';
-    hrvEl.textContent = hrvQ + (isToday ? '' : ' — Higher = better');
-  } else {
-    document.getElementById('hrv-chart').parentElement.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">No HRV data today</div>';
-  }
-
-  // ── Sleep ──
-  var sleepEl = document.getElementById('sleep-bars');
-  var sleepAvgEl = document.getElementById('sleep-avg');
-  if (data.sleepDaily.length) {
-    if (isToday) {
-      var sh = data.sleepDaily[0].val;
-      var sleepColor = sh >= 7.5 ? '#4ADE80' : sh >= 6 ? '#F5C97A' : '#EF4444';
-      var sleepMsg = sh >= 7.5 ? '✅ Well rested' : sh >= 6 ? '⚠️ Acceptable' : '❌ Too little sleep';
-      sleepEl.innerHTML = '<div style="text-align:center;padding:12px;">' +
-        '<span style="font-family:Barlow Condensed,sans-serif;font-size:52px;font-weight:800;color:' + sleepColor + ';">' + sh + '</span>' +
-        '<span style="color:var(--text3);font-size:16px;"> hours</span></div>';
-      sleepAvgEl.textContent = sleepMsg;
-    } else {
-      var maxSleep = Math.max.apply(null, data.sleepDaily.map(function(p){ return p.val; }));
-      sleepEl.innerHTML = data.sleepDaily.slice(-10).map(function(p) {
-        var pct = Math.round(p.val/maxSleep*100);
-        var color = p.val >= 7.5 ? '#4ADE80' : p.val >= 6 ? '#F5C97A' : '#EF4444';
-        return '<div class="sleep-bar-row">' +
-          '<span class="sleep-bar-date">' + p.date.slice(5).replace('-','/') + '</span>' +
-          '<div class="sleep-bar-track"><div class="sleep-bar-fill" style="width:'+pct+'%;background:'+color+';"></div></div>' +
-          '<span class="sleep-bar-val">' + p.val + 'h</span></div>';
-      }).join('');
-      var sAvg = Math.round(data.sleepDaily.reduce(function(a,p){return a+p.val;},0)/data.sleepDaily.length*10)/10;
-      sleepAvgEl.textContent = 'Average: ' + sAvg + 'h/night  ' + (sAvg>=7.5?'✅ Great':sAvg>=6?'⚠️ Acceptable':'❌ Too little');
-    }
-  } else {
-    sleepEl.innerHTML = '<div style="color:var(--text3);font-size:12px;">No sleep data found (check data ends today)</div>';
-  }
-
-  // ── Steps ──
-  if (data.stepsDaily.length) {
-    if (isToday) {
-      var st = data.stepsDaily[0].val;
-      var stPct = Math.min(100, Math.round(st/10000*100));
-      var stColor = st>=10000?'#4ADE80':st>=7000?'#F5C97A':'#DA7756';
-      document.getElementById('steps-chart').parentElement.innerHTML =
-        '<div style="padding:8px 0;">' +
-        '<div style="display:flex;justify-content:space-between;margin-bottom:6px;">' +
-          '<span style="font-family:Barlow Condensed,sans-serif;font-size:32px;font-weight:800;color:'+stColor+';">' + st.toLocaleString() + '</span>' +
-          '<span style="color:var(--text3);font-size:12px;align-self:flex-end;">/ 10,000 goal</span>' +
-        '</div>' +
-        '<div style="background:var(--surface2);border-radius:99px;height:8px;overflow:hidden;">' +
-          '<div style="width:'+stPct+'%;height:100%;background:'+stColor+';border-radius:99px;"></div>' +
-        '</div></div>';
-      document.getElementById('steps-avg').textContent = stPct + '% of daily goal' + (st>=10000?' ✅':'');
-    } else {
-      renderHealthBarChart('steps-chart', data.stepsDaily, '#F5C97A', healthCharts, 'steps');
-      var stAvg = Math.round(data.stepsDaily.reduce(function(a,p){return a+p.val;},0)/data.stepsDaily.length);
-      document.getElementById('steps-avg').textContent = 'Daily avg: ' + stAvg.toLocaleString() + ' steps  ' + (stAvg>=10000?'✅ Excellent':stAvg>=7000?'👍 Good':'⚠️ Move more');
-    }
-  } else {
-    document.getElementById('steps-chart').parentElement.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">No step data today</div>';
-  }
-
-  // ── Apple Watch Workouts ──
-  var awEl = document.getElementById('aw-workouts-list');
-  if (data.awWorkouts && data.awWorkouts.length) {
-    awEl.innerHTML = data.awWorkouts.map(function(w) {
-      var durStr = w.dur >= 60 ? Math.floor(w.dur/60)+'h '+(w.dur%60)+'m' : w.dur+' min';
-      return '<div class="aw-workout-row">' +
-        '<div><div class="aw-workout-type">' + esc(w.type) + '</div><div class="aw-workout-meta">' + w.date + ' · ' + durStr + '</div></div>' +
-        '<div class="aw-workout-cal">' + (w.cal ? w.cal+' kcal' : '—') + '</div></div>';
-    }).join('');
-  } else {
-    awEl.innerHTML = '<div style="color:var(--text3);font-size:13px;">No ' + (isToday?'workouts today':'workouts found') + '</div>';
-  }
-
-  // ── Active Calories ──
-  if (data.calDaily.length) {
-    if (isToday) {
-      var ca = data.calDaily[0].val;
-      document.getElementById('cal-chart').parentElement.innerHTML =
-        '<div style="text-align:center;padding:16px;"><span style="font-family:Barlow Condensed,sans-serif;font-size:48px;font-weight:800;color:#DA7756;">' + ca + '</span><span style="color:var(--text3);font-size:14px;"> kcal</span></div>';
-      document.getElementById('cal-avg').textContent = 'Active calories burned today';
-    } else {
-      renderHealthBarChart('cal-chart', data.calDaily, '#DA7756', healthCharts, 'cal');
-      var caAvg = Math.round(data.calDaily.reduce(function(a,p){return a+p.val;},0)/data.calDaily.length);
-      document.getElementById('cal-avg').textContent = 'Daily average: ' + caAvg + ' kcal active';
-    }
-  } else {
-    document.getElementById('cal-chart').parentElement.innerHTML = '<div style="color:var(--text3);font-size:12px;padding:8px;">No calorie data today</div>';
-  }
-
-  // ── Import note ──
-  var importNote = document.createElement('div');
-  importNote.style.cssText = 'font-size:10px;color:var(--text3);text-align:center;';
-  importNote.textContent = (isToday ? '⌚ Today\'s data — ' : 'Imported: ') + new Date(data.importedAt).toLocaleString('en-GB');
-  panels.appendChild(importNote);
-}
-
-function renderHealthLineChart(canvasId, points, color, unit, chartsObj, key) {
+function renderHealthChart(canvasId, days, values, color, unit, key) {
   var canvas = document.getElementById(canvasId);
-  if (!canvas || !points.length) return;
-  if (chartsObj[key]) { try { chartsObj[key].destroy(); } catch(e){} }
-  var last = points.slice(-30);
-  chartsObj[key] = new Chart(canvas, {
-    type: 'line',
-    data: {
-      labels: last.map(function(p){ return p.date.slice(5).replace('-','/'); }),
-      datasets: [{
-        data: last.map(function(p){ return p.val; }),
-        borderColor: color,
-        backgroundColor: color.replace(')',',0.08)').replace('rgb','rgba'),
-        pointRadius: 2, pointHoverRadius: 5,
-        fill: true, tension: 0.4, borderWidth: 2
-      }]
-    },
-    options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#1a1a1a', borderColor:'rgba(255,255,255,0.1)', borderWidth:1,
-        callbacks:{ label:function(c){ return ' '+c.parsed.y+' '+unit; } } } },
-      scales:{
-        x:{ ticks:{color:'#555',font:{size:8},maxTicksLimit:6}, grid:{display:false}, border:{display:false} },
-        y:{ ticks:{color:'#666',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} }
-      }
-    }
-  });
-}
-
-function renderHealthBarChart(canvasId, points, color, chartsObj, key) {
-  var canvas = document.getElementById(canvasId);
-  if (!canvas || !points.length) return;
-  if (chartsObj[key]) { try { chartsObj[key].destroy(); } catch(e){} }
-  var last = points.slice(-21);
-  chartsObj[key] = new Chart(canvas, {
+  if (!canvas || typeof Chart === 'undefined') return;
+  if (healthCharts[key]) { try { healthCharts[key].destroy(); } catch(e) {} }
+  var ctx = canvas.getContext('2d');
+  healthCharts[key] = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: last.map(function(p){ return p.date.slice(5).replace('-','/'); }),
+      labels: days.map(_formatDay),
       datasets: [{
-        data: last.map(function(p){ return p.val; }),
-        backgroundColor: color + 'aa',
-        borderColor: color, borderWidth: 1, borderRadius: 3
+        data: values,
+        backgroundColor: color,
+        borderRadius: 3,
+        barPercentage: 0.85,
+        categoryPercentage: 0.9
       }]
     },
     options: {
-      responsive:true, maintainAspectRatio:false,
-      plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#1a1a1a',
-        callbacks:{ label:function(c){ return ' '+c.parsed.y.toLocaleString(); } } } },
-      scales:{
-        x:{ ticks:{color:'#555',font:{size:8},maxTicksLimit:7}, grid:{display:false}, border:{display:false} },
-        y:{ ticks:{color:'#666',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false} }
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: function(c){ return ' ' + c.parsed.y + ' ' + unit; }
+          }
+        }
+      },
+      scales: {
+        x: { ticks:{color:'#555',font:{size:8},maxTicksLimit:8}, grid:{display:false}, border:{display:false} },
+        y: { ticks:{color:'#666',font:{size:9}}, grid:{color:'rgba(255,255,255,0.04)'}, border:{display:false}, beginAtZero: true }
       }
     }
   });
 }
 
-// Load health data on stats render
-function renderHealthSection() {
-  if (!loadHealthData() || !healthData) return;
-  renderHealthData(healthData);
+function renderHealthCharts() {
+  var days = _last30Days();
+  var byDate = {};
+  healthEntries.forEach(function(e){ byDate[e.date] = e; });
+
+  var durations = days.map(function(d){ return byDate[d] ? (byDate[d].duration || 0) : 0; });
+  var calories  = days.map(function(d){ return byDate[d] ? (byDate[d].calories || 0) : 0; });
+
+  renderHealthChart('duration-chart', days, durations, '#F5C97A', 'min', 'duration');
+  renderHealthChart('calories-chart', days, calories,  '#DA7756', 'kcal', 'calories');
 }
+
+function renderHealthEntriesList() {
+  var el = document.getElementById('health-entries-list');
+  if (!el) return;
+  if (healthEntries.length === 0) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:8px;">Nessuna entry ancora — aggiungi la prima sopra ☝️</div>';
+    return;
+  }
+  // Show most recent first, up to 20
+  var recent = healthEntries.slice().reverse().slice(0, 20);
+  el.innerHTML = recent.map(function(e){
+    return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;padding:8px 12px;">' +
+      '<div style="display:flex;flex-direction:column;">' +
+        '<div style="font-size:13px;color:var(--text);font-weight:600;">' + e.date + '</div>' +
+        '<div style="font-size:11px;color:var(--text3);">⏱️ ' + (e.duration||0) + ' min &nbsp;·&nbsp; 🔥 ' + (e.calories||0) + ' kcal</div>' +
+      '</div>' +
+      '<button onclick="deleteHealthEntry(\'' + e.date + '\')" style="background:none;border:1px solid var(--border);color:#E27D60;font-size:11px;padding:5px 10px;border-radius:99px;cursor:pointer;font-family:\'Barlow\',sans-serif;">🗑</button>' +
+    '</div>';
+  }).join('');
+}
+
+function renderHealthSection() {
+  loadHealthEntries();
+  // pre-fill date input with today (if empty)
+  var d = document.getElementById('h-date');
+  if (d && !d.value) d.value = _todayISO();
+  renderHealthKPIs();
+  renderHealthCharts();
+  renderHealthEntriesList();
+}
+
 
 // ── INIT ──
 (async function() {
   await load(); await loadProfile(); await loadPlans();
-  loadHealthData(); // pre-load health data from localStorage
+  loadHealthEntries();
   updateHomeStats();
   document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
 })();
@@ -4177,109 +4078,55 @@ function renderHealthSection() {
 
     <!-- Apple Watch / Health Data -->
     <div class="stats-section">
-      <div class="stats-section-title">⌚ Apple Watch & Health</div>
-      <div id="health-section">
-        <!-- Manual input form (shown when no data) -->
-        <div id="health-import-prompt" style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;">
-          <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;">⌚ Today's Health Data <span style="font-size:11px;font-weight:400;color:var(--text3);font-family:'Barlow',sans-serif;">from Apple Watch</span></div>
+      <div class="stats-section-title">🔥 Activity Log</div>
+      <div id="health-section" style="display:flex;flex-direction:column;gap:12px;">
 
+        <!-- INPUT CARD -->
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;">
+          <div style="font-family:'Barlow Condensed',sans-serif;font-size:16px;font-weight:800;color:var(--text);margin-bottom:12px;">
+            ✍️ Add entry
+          </div>
+          <div class="profile-field" style="margin-bottom:8px;">
+            <label>📅 Date</label>
+            <input type="date" id="h-date">
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
             <div class="profile-field">
-              <label>❤️ Avg HR (bpm)</label>
-              <input type="number" id="h-hr" placeholder="es. 68" min="30" max="220" inputmode="numeric">
+              <label>⏱️ Duration (min)</label>
+              <input type="number" id="h-duration" placeholder="es. 55" min="0" max="600" inputmode="numeric">
             </div>
             <div class="profile-field">
-              <label>💚 HRV (ms)</label>
-              <input type="number" id="h-hrv" placeholder="es. 45" min="1" max="200" inputmode="numeric">
-            </div>
-            <div class="profile-field">
-              <label>😴 Sonno (ore)</label>
-              <input type="number" id="h-sleep" placeholder="es. 7.5" min="0" max="14" step="0.5" inputmode="decimal">
-            </div>
-            <div class="profile-field">
-              <label>👟 Passi</label>
-              <input type="number" id="h-steps" placeholder="es. 8400" min="0" max="100000" inputmode="numeric">
-            </div>
-            <div class="profile-field">
-              <label>🔥 Cal. attive</label>
-              <input type="number" id="h-cal" placeholder="es. 520" min="0" max="5000" inputmode="numeric">
-            </div>
-            <div class="profile-field">
-              <label>🏃 Workout (min)</label>
-              <input type="number" id="h-workout-min" placeholder="es. 55" min="0" max="600" inputmode="numeric">
+              <label>🔥 Calories (kcal)</label>
+              <input type="number" id="h-calories" placeholder="es. 420" min="0" max="5000" inputmode="numeric">
             </div>
           </div>
-
-          <div class="profile-field" style="margin-top:6px;">
-            <label>🏋️ Workout type</label>
-            <select id="h-workout-type">
-              <option value="">— none today —</option>
-              <option>Traditional Strength Training</option>
-              <option>Functional Strength Training</option>
-              <option>Running</option>
-              <option>Cycling</option>
-              <option>HIIT</option>
-              <option>Yoga</option>
-              <option>Swimming</option>
-              <option>Walking</option>
-              <option>Other</option>
-            </select>
-          </div>
-
-          <button onclick="saveManualHealthData()" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#F5C97A,#DA7756);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:13px;border-radius:99px;cursor:pointer;">
-            ⌚ Save today's data
+          <button onclick="saveHealthEntry()" style="width:100%;margin-top:14px;background:linear-gradient(135deg,#F5C97A,#DA7756);color:#0d0d0d;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:16px;letter-spacing:1px;text-transform:uppercase;padding:13px;border-radius:99px;cursor:pointer;">
+            💾 Save entry
           </button>
+          <div id="h-save-status" style="font-size:12px;color:var(--text3);text-align:center;min-height:16px;margin-top:6px;"></div>
         </div>
 
-        <!-- Data panels (hidden until imported) -->
-        <div id="health-data-panels" style="display:none;display:flex;flex-direction:column;gap:10px;">
+        <!-- KPI ROW -->
+        <div id="health-kpi-row" style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px;"></div>
 
-          <!-- Summary row -->
-          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;" id="health-kpi-row"></div>
-
-          <!-- Heart Rate -->
-          <div class="health-card">
-            <div class="health-card-title">❤️ Heart Rate</div>
-            <div style="position:relative;height:100px;"><canvas id="hr-chart"></canvas></div>
-            <div id="hr-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:8px;"></div>
-          </div>
-
-          <!-- HRV -->
-          <div class="health-card">
-            <div class="health-card-title">💚 Heart Rate Variability (HRV)</div>
-            <div style="position:relative;height:80px;"><canvas id="hrv-chart"></canvas></div>
-            <div id="hrv-stats" style="margin-top:6px;font-size:12px;color:var(--text3);"></div>
-          </div>
-
-          <!-- Sleep -->
-          <div class="health-card">
-            <div class="health-card-title">😴 Sleep</div>
-            <div id="sleep-bars" style="display:flex;flex-direction:column;gap:5px;margin-top:4px;"></div>
-            <div id="sleep-avg" style="margin-top:8px;font-size:12px;color:var(--text3);text-align:center;"></div>
-          </div>
-
-          <!-- Steps -->
-          <div class="health-card">
-            <div class="health-card-title">👟 Steps</div>
-            <div style="position:relative;height:80px;"><canvas id="steps-chart"></canvas></div>
-            <div id="steps-avg" style="margin-top:6px;font-size:12px;color:var(--text3);text-align:center;"></div>
-          </div>
-
-          <!-- Workouts -->
-          <div class="health-card">
-            <div class="health-card-title">🏃 Apple Watch Workouts</div>
-            <div id="aw-workouts-list"></div>
-          </div>
-
-          <!-- Active Calories -->
-          <div class="health-card">
-            <div class="health-card-title">🔥 Active Calories</div>
-            <div style="position:relative;height:80px;"><canvas id="cal-chart"></canvas></div>
-            <div id="cal-avg" style="margin-top:6px;font-size:12px;color:var(--text3);text-align:center;"></div>
-          </div>
-
-          <button onclick="clearHealthData()" style="background:none;border:1px solid var(--border);color:var(--text3);font-size:12px;padding:8px;border-radius:99px;cursor:pointer;font-family:'Barlow',sans-serif;">🗑 Clear Health Data</button>
+        <!-- CHART: DURATION -->
+        <div class="health-card">
+          <div class="health-card-title">⏱️ Duration — last 30 days</div>
+          <div style="position:relative;height:120px;"><canvas id="duration-chart"></canvas></div>
         </div>
+
+        <!-- CHART: CALORIES -->
+        <div class="health-card">
+          <div class="health-card-title">🔥 Calories — last 30 days</div>
+          <div style="position:relative;height:120px;"><canvas id="calories-chart"></canvas></div>
+        </div>
+
+        <!-- ENTRIES LIST -->
+        <div class="health-card">
+          <div class="health-card-title">📋 Recent entries</div>
+          <div id="health-entries-list" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+        </div>
+
       </div>
     </div>
 
