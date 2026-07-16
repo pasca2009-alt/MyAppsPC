@@ -531,6 +531,20 @@ html, body { background: var(--bg); color: var(--text); font-family: 'Barlow', s
 
 <!-- HOME -->
 <div id="home" class="screen active">
+  <!-- Resume workout banner (visible only when a workout is active) -->
+  <div id="resume-workout-banner" style="display:none;align-items:center;justify-content:space-between;gap:10px;margin:12px 12px 0;padding:12px 14px;background:linear-gradient(135deg,#F5C97A,#DA7756);border-radius:14px;color:#0d0d0d;font-family:'Barlow',sans-serif;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:22px;">▶</div>
+      <div>
+        <div style="font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:15px;letter-spacing:0.5px;text-transform:uppercase;line-height:1.1;">Workout in corso</div>
+        <div style="font-size:11px;opacity:0.85;">Tocca per riprendere</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;">
+      <button onclick="resumeWorkout()" style="background:#0d0d0d;color:#F5C97A;border:none;font-family:'Barlow Condensed',sans-serif;font-weight:800;font-size:12px;letter-spacing:1px;text-transform:uppercase;padding:8px 14px;border-radius:99px;cursor:pointer;">Riprendi</button>
+      <button onclick="discardWorkout()" title="Abbandona" style="background:rgba(0,0,0,0.15);color:#0d0d0d;border:none;font-size:14px;padding:8px 10px;border-radius:99px;cursor:pointer;">✕</button>
+    </div>
+  </div>
   <div class="home-hero">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;"><div class="home-badge">⚡ Gym Coach</div><div id="home-date" style="font-size:12px;color:var(--text3);letter-spacing:0.5px;"></div></div>
     <div class="home-title" id="home-greeting">TODAY<br>WE <span>TRAIN.</span></div>
@@ -905,6 +919,9 @@ function goTo(id) {
   if (id === 'profile-screen') renderProfileScreen();
   if (id === 'home') updateHomeStats();
   if (id === 'plans-screen') renderPlansScreen();
+  // Save workout state whenever navigation happens
+  if (typeof saveWorkoutState === 'function') saveWorkoutState();
+  if (typeof updateResumeBanner === 'function') updateResumeBanner();
 }
 
 // ── HORIZONTAL SWIPE BETWEEN MAIN SCREENS ──
@@ -1509,7 +1526,7 @@ function updateHomeStats() {
   document.getElementById('stat-sessions').textContent = sessionHistory.length;
   document.getElementById('stat-machines').textContent = machines.length;
   document.getElementById('stat-series').textContent = sessionHistory.reduce(function(a,s){ return a+s.totalSeries; }, 0);
-  document.getElementById('stat-last').textContent = sessionHistory.length ? sessionHistory[0].date.split(',')[0] : '—';
+  document.getElementById('stat-last').textContent = sessionHistory.length ? (sessionHistory[0].date.split(',')[1] || sessionHistory[0].date).trim() : '—';
 }
 
 function renderMachineList() {
@@ -1614,6 +1631,95 @@ function getMuscleGroup(machineName) {
 var aiWorkoutQueue = [];
 var aiWorkoutActive = false;
 var postponedMachines = [];
+
+// ── WORKOUT STATE PERSISTENCE ──
+// Save current workout to localStorage so it survives page reloads / accidental navigation
+function saveWorkoutState() {
+  try {
+    var isActive = (aiWorkoutQueue && aiWorkoutQueue.length > 0) ||
+                   (completedLog && completedLog.length > 0) ||
+                   (currentMachine !== null);
+    if (!isActive) { clearWorkoutState(); return; }
+    var state = {
+      queue: aiWorkoutQueue,
+      active: aiWorkoutActive,
+      postponed: postponedMachines,
+      currentMachine: currentMachine,
+      currentSeries: currentSeries,
+      completedLog: completedLog,
+      exerciseCount: exerciseCount,
+      screen: (document.querySelector('.screen.active') || {}).id || 'queue-screen',
+      savedAt: Date.now()
+    };
+    localStorage.setItem('gymcoach_workout_state', JSON.stringify(state));
+  } catch(e) {}
+}
+
+function clearWorkoutState() {
+  try { localStorage.removeItem('gymcoach_workout_state'); } catch(e) {}
+}
+
+function loadWorkoutState() {
+  try {
+    var raw = localStorage.getItem('gymcoach_workout_state');
+    if (!raw) return null;
+    var s = JSON.parse(raw);
+    // Discard states older than 12 hours (stale)
+    if (s.savedAt && (Date.now() - s.savedAt) > 12 * 60 * 60 * 1000) {
+      clearWorkoutState(); return null;
+    }
+    return s;
+  } catch(e) { return null; }
+}
+
+function hasActiveWorkout() {
+  var s = loadWorkoutState();
+  if (!s) return false;
+  return (s.queue && s.queue.length > 0) ||
+         (s.completedLog && s.completedLog.length > 0) ||
+         !!s.currentMachine;
+}
+
+function resumeWorkout() {
+  var s = loadWorkoutState();
+  if (!s) { updateResumeBanner(); return; }
+  aiWorkoutQueue     = s.queue || [];
+  aiWorkoutActive    = !!s.active;
+  postponedMachines  = s.postponed || [];
+  currentMachine     = s.currentMachine || null;
+  currentSeries      = s.currentSeries || 0;
+  completedLog       = s.completedLog || [];
+  exerciseCount      = s.exerciseCount || 0;
+  // Re-render whatever screen the user was on
+  if (s.screen === 'workout-screen' && currentMachine) {
+    // Re-render workout screen with current exercise
+    document.getElementById('ex-counter').textContent = 'Exercise ' + exerciseCount;
+    document.getElementById('ex-name').textContent = currentMachine.name;
+    document.getElementById('ex-series-pill').textContent = currentMachine.series + ' sets';
+    document.getElementById('ex-reps-pill').textContent = currentMachine.reps + ' reps';
+    document.getElementById('muscle-tags').innerHTML = (currentMachine.muscles || []).map(function(m){ return '<span class="muscle-tag">' + esc(m) + '</span>'; }).join('');
+    var wInput = document.getElementById('weight-input');
+    if (wInput) wInput.value = currentMachine.weight || '';
+    goTo('workout-screen');
+  } else {
+    renderQueueScreen();
+    goTo('queue-screen');
+  }
+}
+
+function updateResumeBanner() {
+  var banner = document.getElementById('resume-workout-banner');
+  if (!banner) return;
+  banner.style.display = hasActiveWorkout() ? 'flex' : 'none';
+}
+
+function discardWorkout() {
+  if (!confirm('Vuoi davvero abbandonare il workout in corso? I dati non salvati andranno persi.')) return;
+  aiWorkoutQueue = []; aiWorkoutActive = false; postponedMachines = [];
+  currentMachine = null; currentSeries = 0; completedLog = []; exerciseCount = 0;
+  clearWorkoutState();
+  updateResumeBanner();
+}
 
 function pickNextMachine() {
   // If AI/planned workout is active, use the queue
@@ -1900,6 +2006,7 @@ function showPRToast(machineName) {
 
 async function finishWorkout() {
   aiWorkoutActive = false; aiWorkoutQueue = [];
+  clearWorkoutState();
   var done = completedLog.filter(function(e){ return !e.skipped && e.series > 0; });
   if (!done.length) {
     // Try saving any exercises started even without completed sets
@@ -3919,6 +4026,8 @@ function renderHealthSection() {
   loadHealthEntries();
   updateHomeStats();
   document.getElementById('home-date').textContent = new Date().toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',year:'numeric'});
+  // Show resume banner if a workout was left mid-way
+  updateResumeBanner();
 })();
 </script>
 
