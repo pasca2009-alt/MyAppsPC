@@ -1533,7 +1533,8 @@ function renderMachineList() {
   var list = document.getElementById('machine-list');
   if (!machines.length) { list.innerHTML = '<div class="empty-state">No machines yet.<br>Add one!</div>'; return; }
   list.innerHTML = '';
-  machines.forEach(function(m) {
+  var sorted = machines.slice().sort(function(a,b){ return a.name.localeCompare(b.name); });
+  sorted.forEach(function(m) {
     var div = document.createElement('div');
     div.className = 'machine-item';
     div.innerHTML = '<div class="machine-icon">' + getMachineIcon(m.name) + '</div>'
@@ -1602,19 +1603,62 @@ function isMachineAllowed(machineName) {
   return false;
 }
 
+// ORDER MATTERS: specific patterns first, generic ones last (first match wins)
 var MUSCLE_GROUPS = {
-  'shoulder': ['shoulder press', 'converging shoulder', 'lateral raise', 'rear delt', 'alzate'],
-  'biceps':   ['arm curl', 'chin assist'],
-  'triceps':  ['dip assist', 'tricep'],
-  'chest':    ['chest press', 'incline press', 'dip', 'fly', 'pec deck', 'converging chest', 'supine press'],
-  'back':     ['lat pulldown', 'lat machine', 'seated row', 'diverging', 'chin', 'pullover'],
-  'quads':    ['leg press', 'leg extension', '45 degree', '45-degree', '45 deg'],
-  'hamstrings': ['leg curl', 'prone leg curl'],
-  'glutes':   ['hip thrust', 'glute kickback', 'glute'],
+  // GLUTES specifics (before "squat" so bulgarian/sumo/etc. don't fall into quads)
+  'glutes':   [
+    'hip thrust', 'glute bridge', 'glute kickback', 'glute',
+    'bulgarian split squat', 'bulgarian', 'sumo squat', 'sumo deadlift',
+    'romanian deadlift', 'rdl', 'stiff leg deadlift', 'stiff-leg deadlift', 'deadlift',
+    'reverse lunge', 'walking lunge', 'lunge',
+    'step up', 'step-up', 'cable kickback', 'pull through', 'pull-through', 'good morning'
+  ],
+  // QUADS specifics
+  'quads':    [
+    'hack squat', 'front squat', 'goblet squat', 'sissy squat', 'squat',
+    'leg press', 'leg extension',
+    '45 degree', '45-degree', '45 deg'
+  ],
+  'hamstrings': ['leg curl', 'prone leg curl', 'nordic', 'ham curl', 'hamstring'],
   'hips':     ['hip abductor', 'hip adductor', 'abductor', 'adductor'],
   'calves':   ['calf raise', 'calf'],
-  'core':     ['abdominal', 'crunch', 'core', 'pallof'],
-  'back_ext': ['back extension', 'lumbar']
+  // UPPER BODY
+  'shoulder': [
+    'shoulder press', 'converging shoulder', 'lateral raise', 'lateral rise',
+    'rear delt', 'front raise', 'arnold press', 'overhead press', 'military press',
+    'face pull', 'face-pull', 'reverse fly', 'reverse pec deck',
+    'alzate', 'alzata', 'delt', 'upright row'
+  ],
+  'biceps':   [
+    'biceps curl', 'bicep curl', 'barbell curl', 'dumbbell curl',
+    'preacher curl', 'hammer curl', 'cable curl', 'ez curl', 'ez-curl',
+    'concentration curl', 'incline curl', 'spider curl', 'arm curl',
+    'chin assist', 'chin-up', 'chin up', 'curl'
+  ],
+  'triceps':  [
+    'triceps extension', 'tricep extension', 'triceps pushdown', 'tricep pushdown',
+    'pushdown', 'push-down', 'skullcrusher', 'skull crusher', 'french press',
+    'close grip bench', 'close-grip bench', 'kickback', 'dip assist', 'tricep', 'triceps'
+  ],
+  'chest':    [
+    'bench press', 'chest press', 'incline press', 'decline press',
+    'incline bench', 'decline bench',
+    'pec deck', 'converging chest', 'supine press',
+    'chest fly', 'cable fly', 'dumbbell fly', 'fly', 'pec',
+    'dip', 'push up', 'push-up', 'pushup'
+  ],
+  'back':     [
+    'lat pulldown', 'lat machine', 'seated row', 'barbell row', 'dumbbell row',
+    'bent over row', 'bent-over row', 'cable row', 'inverted row',
+    't-bar row', 't bar row', 'diverging', 'pull up', 'pull-up', 'pullup',
+    'chin', 'pullover', 'lat', 'row', 'shrug', 'trap'
+  ],
+  'core':     [
+    'abdominal', 'abs', 'crunch', 'sit up', 'sit-up', 'situp',
+    'plank', 'pallof', 'russian twist', 'leg raise', 'hanging knee',
+    'ab wheel', 'wood chop', 'core'
+  ],
+  'back_ext': ['back extension', 'hyperextension', 'lumbar']
 };
 
 function getMuscleGroup(machineName) {
@@ -3296,12 +3340,35 @@ function renderProgressIndicators() {
 
   // ── MUSCLE BALANCE ──
   var groupCount = {};
+  var unclassifiedNames = {}; // {exerciseName: count} for those returning 'other'
   sessionHistory.slice(0,10).forEach(function(s){
     (s.exercises||[]).forEach(function(e){
       var g = getMuscleGroup(e.name);
       groupCount[g] = (groupCount[g]||0)+1;
+      if (g === 'other') {
+        unclassifiedNames[e.name] = (unclassifiedNames[e.name] || 0) + 1;
+      }
     });
   });
+  // Populate unclassified list
+  var unNames = Object.keys(unclassifiedNames).sort(function(a,b){ return unclassifiedNames[b] - unclassifiedNames[a]; });
+  var countEl = document.getElementById('unclassified-count');
+  var listEl = document.getElementById('unclassified-list');
+  if (countEl) countEl.textContent = unNames.length;
+  if (listEl) {
+    if (unNames.length === 0) {
+      listEl.innerHTML = '<div style="color:var(--text3);padding:6px;">Tutti gli esercizi sono classificati correttamente ✓</div>';
+    } else {
+      listEl.innerHTML =
+        '<div style="color:var(--text3);margin-bottom:6px;font-style:italic;">Questi esercizi non finiscono in nessun gruppo. Rinominali con parole chiave riconosciute (es. "curl", "squat", "row", "press") per farli contare:</div>' +
+        unNames.map(function(name){
+          return '<div style="display:flex;justify-content:space-between;padding:4px 8px;background:rgba(255,255,255,0.02);border-radius:6px;margin-bottom:3px;">' +
+            '<span style="color:var(--text);">' + esc(name) + '</span>' +
+            '<span style="color:var(--text3);">×' + unclassifiedNames[name] + '</span>' +
+          '</div>';
+        }).join('');
+    }
+  }
   var allG = ['chest','back','shoulder','biceps','triceps','quads','hamstrings','glutes','core'];
   var maxG = Math.max.apply(null, allG.map(function(g){ return groupCount[g]||0; }).concat([1]));
   document.getElementById('ind-balance').innerHTML = allG.map(function(g){
@@ -4019,6 +4086,15 @@ function renderHealthSection() {
   renderHealthEntriesList();
 }
 
+function toggleUnclassifiedList() {
+  var list = document.getElementById('unclassified-list');
+  var arrow = document.getElementById('unclassified-toggle');
+  if (!list || !arrow) return;
+  var isHidden = list.style.display === 'none' || !list.style.display;
+  list.style.display = isHidden ? 'block' : 'none';
+  arrow.textContent = isHidden ? '▼' : '▶';
+}
+
 
 // ── INIT ──
 (async function() {
@@ -4364,6 +4440,12 @@ function renderHealthSection() {
     <div class="indicator-card">
       <div class="indicator-title">🏋️ Muscle Balance</div>
       <div id="ind-balance">—</div>
+      <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+        <button onclick="toggleUnclassifiedList()" style="width:100%;background:none;border:1px solid var(--border);color:var(--text2);font-size:12px;padding:8px;border-radius:8px;cursor:pointer;font-family:'Barlow',sans-serif;text-align:left;">
+          <span id="unclassified-toggle">▶</span> Esercizi non classificati (<span id="unclassified-count">0</span>)
+        </button>
+        <div id="unclassified-list" style="display:none;margin-top:8px;font-size:11px;color:var(--text3);"></div>
+      </div>
     </div>
 
     <!-- Backup / Restore -->
