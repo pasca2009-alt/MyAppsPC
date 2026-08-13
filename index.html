@@ -3473,6 +3473,8 @@ function renderPlansScreen() {
         '</div>' +
         '<div class="plan-card-actions">' +
           '<button class="plan-del-btn" data-id="' + plan.id + '" title="Edit">✏️</button>' +
+          '<button class="plan-dup-btn" data-id="' + plan.id + '" title="Duplicate" style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px 6px;">📋</button>' +
+          '<button class="plan-trash-btn" data-id="' + plan.id + '" title="Delete" style="background:none;border:none;font-size:16px;cursor:pointer;padding:4px 6px;">🗑</button>' +
           '<span class="plan-card-arrow">▼</span>' +
         '</div>' +
       '</div>' +
@@ -3494,12 +3496,24 @@ function renderPlansScreen() {
     // Toggle open/close
     card.querySelector('.plan-card-header').addEventListener('click', function(e) {
       if (e.target.classList.contains('plan-del-btn')) return;
+      if (e.target.classList.contains('plan-dup-btn')) return;
+      if (e.target.classList.contains('plan-trash-btn')) return;
       if (e.target.classList.contains('plan-start-btn')) return;
       card.classList.toggle('open');
     });
     // Edit button
     card.querySelector('.plan-del-btn').addEventListener('click', function() {
       openEditPlan(plan.id);
+    });
+    // Duplicate button
+    card.querySelector('.plan-dup-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      duplicatePlan(plan.id);
+    });
+    // Delete button
+    card.querySelector('.plan-trash-btn').addEventListener('click', function(e) {
+      e.stopPropagation();
+      deletePlan(plan.id);
     });
     // Start buttons
     card.querySelectorAll('.plan-start-btn').forEach(function(btn) {
@@ -3674,6 +3688,27 @@ async function savePlan() {
 async function deletePlan(planId) {
   if (!confirm('Delete this plan?')) return;
   workoutPlans = workoutPlans.filter(function(p){ return p.id !== planId; });
+  await savePlansStorage();
+  renderPlansScreen();
+}
+
+async function duplicatePlan(planId) {
+  var src = workoutPlans.find(function(p){ return p.id === planId; });
+  if (!src) return;
+  // Deep-clone lists and re-assign fresh IDs so edits on the copy don't touch the original
+  var copyLists = (src.lists || []).map(function(lst, i){
+    return {
+      id: Date.now() + i + 1,
+      name: lst.name,
+      exerciseIds: (lst.exerciseIds || []).slice() // copy of the array
+    };
+  });
+  var copy = {
+    id: Date.now(),
+    name: src.name + ' (copy)',
+    lists: copyLists
+  };
+  workoutPlans.push(copy);
   await savePlansStorage();
   renderPlansScreen();
 }
